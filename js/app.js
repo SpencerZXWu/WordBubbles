@@ -32,6 +32,16 @@ const App = (() => {
   let slideLevel = 'easy';
   let suState = null;
   let suLevel = 'easy';
+  let ngState = null;
+  let ngLevel = 'easy';
+  let g8State = null;
+  let g8Level = 'easy';
+  let tyState = null;
+  let tyLevel = 'easy';
+  let cbState = null;
+  let cbLevel = 'easy';
+  let laState = null;
+  let laLevel = 'easy';
   let flagMode = false;
 
   let wordstackState = null;
@@ -122,6 +132,28 @@ const App = (() => {
         if (e.key === 'ArrowLeft') { e.preventDefault(); sudokuMove(0, -1); return; }
         if (e.key === 'ArrowRight') { e.preventDefault(); sudokuMove(0, 1); return; }
       }
+      if (!typing && ngState && ngState.status === 'playing' && (e.key === 'x' || e.key === 'X')) {
+        e.preventDefault();
+        Nonogram.toggleMode(ngState);
+        UI.nonogramSync(ngState);
+        return;
+      }
+      if (!typing && g8State && g8State.status === 'playing') {
+        if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { e.preventDefault(); doG2048Move('up'); return; }
+        if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { e.preventDefault(); doG2048Move('down'); return; }
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { e.preventDefault(); doG2048Move('left'); return; }
+        if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); doG2048Move('right'); return; }
+      }
+      if (!typing && cbState && cbState.status === 'playing') {
+        if (e.key >= '0' && e.key <= '9') {
+          e.preventDefault();
+          if (Number(e.key) < cbState.alphabet) cbDigit(Number(e.key));
+          else cbSay('This level only uses digits 0-' + (cbState.alphabet - 1), true);
+          return;
+        }
+        if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); cbBack(); return; }
+        if (e.key === 'Enter') { e.preventDefault(); cbSubmit(); return; }
+      }
       if (!typing && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         toggleFullscreen();
@@ -190,12 +222,18 @@ const App = (() => {
     mineState = null;
     slideState = null;
     suState = null;
+    ngState = null;
+    g8State = null;
+    tyState = null;
+    cbState = null;
+    laState = null;
     wordstackState = null;
     tactaState = null;
     tcSel = -1;
     clearMathTimers();
     clearWsTimers();
     clearTcTimers();
+    clearTyTimers();
     stopTimer();
     hideMind();
     setArmed(false);
@@ -276,6 +314,16 @@ const App = (() => {
         if (selected.length === 1) showSlideDifficulty();
       } else if (mode === 'sudoku') {
         if (selected.length === 1) showSudokuDifficulty();
+      } else if (mode === 'nonogram') {
+        if (selected.length === 1) showNonogramDifficulty();
+      } else if (mode === 'g2048') {
+        if (selected.length === 1) showG2048Difficulty();
+      } else if (mode === 'typing') {
+        if (selected.length === 1) showTypingDifficulty();
+      } else if (mode === 'codebreak') {
+        if (selected.length === 1) showCodeBreakDifficulty();
+      } else if (mode === 'ladder') {
+        if (selected.length === 1) showLadderDifficulty();
       } else if (selected.length === 1) {
         showDifficulty();
       }
@@ -379,9 +427,15 @@ const App = (() => {
     mineState = null;
     slideState = null;
     suState = null;
+    ngState = null;
+    g8State = null;
+    tyState = null;
+    cbState = null;
+    laState = null;
     wordstackState = null;
     chessBusy = false;
     boardBusy = false;
+    clearTyTimers();
   }
 
   function refreshProgress() {
@@ -2356,6 +2410,598 @@ const App = (() => {
     animateScore(res.points);
     if (res.solved) celebrate();
     document.getElementById('suAgainBtn').addEventListener('click', () => startSudoku(st.level));
+    document.getElementById('homeBtn').addEventListener('click', showHome);
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  /* ---------------- Nonogram ---------------- */
+
+  let ngPaint = null;          // { value } while dragging across squares
+
+  function showNonogramDifficulty() {
+    UI.nonogramDifficulty(ngLevel);
+    document.querySelectorAll('[data-nglevel]').forEach(card => {
+      card.addEventListener('click', () => {
+        ngLevel = card.dataset.nglevel;
+        showNonogramDifficulty();
+      });
+    });
+    document.getElementById('backHome').addEventListener('click', showHome);
+    document.getElementById('startBtn').addEventListener('click', () => startNonogram(ngLevel));
+  }
+
+  function startNonogram(level) {
+    ngState = Nonogram.start(level);
+    ngLevel = ngState.level;
+    ngPaint = null;
+    boardBusy = false;
+    UI.nonogramGame(ngState);
+    bindNonogram();
+    bindHome();
+    UI.nonogramSync(ngState);
+    startTimer();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function ngValueNow(st) {
+    return st.mode === 'mark' ? Nonogram.EMPTY : Nonogram.FILLED;
+  }
+
+  function ngPaintAt(i, value) {
+    const st = ngState;
+    if (!st || st.status !== 'playing') return;
+    if (!Nonogram.set(st, i, value)) return;
+    UI.nonogramSync(st);
+    if (st.status === 'solved') leaveNonogramScreen();
+  }
+
+  function bindNonogram() {
+    const grid = document.getElementById('ngGrid');
+    if (grid) {
+      grid.addEventListener('pointerdown', e => {
+        const cell = e.target.closest('.ng-c');
+        if (!cell || !ngState) return;
+        e.preventDefault();
+        const i = Number(cell.dataset.i);
+        const want = ngValueNow(ngState);
+        /* a drag paints the opposite of whatever the first square was */
+        ngPaint = { value: ngState.marks[i] === want ? Nonogram.UNKNOWN : want };
+        ngPaintAt(i, ngPaint.value);
+      });
+      grid.addEventListener('pointermove', e => {
+        if (!ngPaint || !ngState) return;
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const cell = el && el.closest ? el.closest('.ng-c') : null;
+        if (cell) ngPaintAt(Number(cell.dataset.i), ngPaint.value);
+      });
+      grid.addEventListener('pointerup', () => { ngPaint = null; });
+      grid.addEventListener('pointerleave', () => { ngPaint = null; });
+    }
+    document.addEventListener('pointerup', () => { ngPaint = null; });
+    const mode = document.getElementById('ngMode');
+    if (mode) mode.addEventListener('click', () => {
+      if (!ngState) return;
+      Nonogram.toggleMode(ngState);
+      UI.nonogramSync(ngState);
+    });
+    const clear = document.getElementById('ngClear');
+    if (clear) clear.addEventListener('click', () => {
+      if (!ngState) return;
+      Nonogram.clearAll(ngState);
+      UI.nonogramSync(ngState);
+    });
+    const again = document.getElementById('ngNew');
+    if (again) again.addEventListener('click', () => startNonogram(ngState ? ngState.level : ngLevel));
+  }
+
+  function leaveNonogramScreen() {
+    const screen = document.querySelector('.ng-screen');
+    if (!screen || reduceMotion) { finishNonogram(); return; }
+    screen.classList.add('screen-leaving');
+    setTimeout(finishNonogram, LEAVE_MS);
+  }
+
+  function finishNonogram() {
+    const st = ngState;
+    if (!st) return;
+    if (st.status === 'playing' && !Nonogram.check(st)) return;
+    st.elapsedMs = elapsedMs();
+    stopTimer();
+    const res = Nonogram.finish(st);
+    const me = mePlaying();
+    if (me) {
+      Store.recordGame(me.id, {
+        mode: 'nonogram',
+        difficulty: st.level,
+        points: res.points,
+        seconds: res.seconds,
+        correct: res.shaded,
+        total: res.total,
+        speed: res.speed,
+        perfect: res.solved,
+        myScore: res.shaded,
+        outcome: res.solved ? 'win' : 'lose'
+      });
+    }
+    UI.nonogramResult(st, res);
+    animateScore(res.points);
+    if (res.solved) celebrate();
+    document.getElementById('ngAgainBtn').addEventListener('click', () => startNonogram(st.level));
+    document.getElementById('homeBtn').addEventListener('click', showHome);
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  /* ---------------- 2048 ---------------- */
+
+  let g8Swipe = null;
+
+  function showG2048Difficulty() {
+    UI.g2048Difficulty(g8Level);
+    document.querySelectorAll('[data-g8level]').forEach(card => {
+      card.addEventListener('click', () => {
+        g8Level = card.dataset.g8level;
+        showG2048Difficulty();
+      });
+    });
+    document.getElementById('backHome').addEventListener('click', showHome);
+    document.getElementById('startBtn').addEventListener('click', () => startG2048(g8Level));
+  }
+
+  function startG2048(level) {
+    g8State = G2048.start(level);
+    g8Level = g8State.level;
+    g8Swipe = null;
+    boardBusy = false;
+    UI.g2048Game(g8State);
+    bindG2048();
+    bindHome();
+    UI.g2048Sync(g8State, null);
+    startTimer();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function bindG2048() {
+    const wrap = document.getElementById('g8Wrap');
+    if (wrap) {
+      wrap.addEventListener('pointerdown', e => {
+        g8Swipe = { x: e.clientX, y: e.clientY };
+      });
+      wrap.addEventListener('pointerup', e => {
+        if (!g8Swipe) return;
+        const dx = e.clientX - g8Swipe.x, dy = e.clientY - g8Swipe.y;
+        g8Swipe = null;
+        if (Math.abs(dx) < 22 && Math.abs(dy) < 22) return;
+        doG2048Move(Math.abs(dx) > Math.abs(dy)
+          ? (dx > 0 ? 'right' : 'left')
+          : (dy > 0 ? 'down' : 'up'));
+      });
+      wrap.addEventListener('pointercancel', () => { g8Swipe = null; });
+    }
+    [['g8Up', 'up'], ['g8Down', 'down'], ['g8Left', 'left'], ['g8Right', 'right']]
+      .forEach(pair => {
+        const b = document.getElementById(pair[0]);
+        if (b) b.addEventListener('click', () => doG2048Move(pair[1]));
+      });
+    const again = document.getElementById('g8New');
+    if (again) again.addEventListener('click', () => startG2048(g8State ? g8State.level : g8Level));
+  }
+
+  function doG2048Move(dir) {
+    const st = g8State;
+    if (!st || st.status !== 'playing') return false;
+    const res = G2048.move(st, dir);
+    if (!res.moved) return true;
+    UI.g2048Sync(st, res);
+    const say = document.getElementById('g8Status');
+    if (say) {
+      say.textContent = res.merged.length
+        ? 'Merged ' + res.merged.length + ' tile' + (res.merged.length === 1 ? '' : 's') +
+          ' · biggest ' + res.best + ' of ' + st.goal
+        : 'Slid · biggest ' + res.best + ' of ' + st.goal;
+    }
+    if (st.status !== 'playing') leaveG2048Screen();
+    return true;
+  }
+
+  function leaveG2048Screen() {
+    const screen = document.querySelector('.g8-screen');
+    if (!screen || reduceMotion) { finishG2048(); return; }
+    screen.classList.add('screen-leaving');
+    setTimeout(finishG2048, LEAVE_MS);
+  }
+
+  function finishG2048() {
+    const st = g8State;
+    if (!st) return;
+    st.elapsedMs = elapsedMs();
+    stopTimer();
+    const res = G2048.finish(st);
+    const me = mePlaying();
+    if (me) {
+      Store.recordGame(me.id, {
+        mode: 'g2048',
+        difficulty: st.level,
+        points: res.points,
+        seconds: res.seconds,
+        correct: res.moves,
+        total: res.merges,
+        outcome: res.solved ? 'win' : 'lose',
+        perfect: res.solved,
+        myScore: res.best
+      });
+    }
+    UI.g2048Result(st, res);
+    animateScore(res.points);
+    if (res.solved) celebrate();
+    document.getElementById('g8AgainBtn').addEventListener('click', () => startG2048(st.level));
+    document.getElementById('homeBtn').addEventListener('click', showHome);
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  /* ---------------- Typing Sprint ---------------- */
+
+  let tyTick = null;
+
+  const clearTyTimers = () => { if (tyTick) { clearInterval(tyTick); tyTick = null; } };
+
+  function showTypingDifficulty() {
+    UI.typingDifficulty(tyLevel);
+    document.querySelectorAll('[data-tylevel]').forEach(card => {
+      card.addEventListener('click', () => {
+        tyLevel = card.dataset.tylevel;
+        showTypingDifficulty();
+      });
+    });
+    document.getElementById('backHome').addEventListener('click', showHome);
+    document.getElementById('startBtn').addEventListener('click', () => startTyping(tyLevel));
+  }
+
+  function startTyping(level) {
+    clearTyTimers();
+    tyState = Typing.start(level);
+    tyLevel = tyState.level;
+    boardBusy = false;
+    UI.typingGame(tyState);
+    bindTyping();
+    bindHome();
+    UI.typingSync(tyState);
+    startTimer();
+    /* a light tick keeps the live speed readout honest */
+    tyTick = setInterval(() => { if (tyState) UI.typingSync(tyState); }, 500);
+    const box = document.getElementById('tyInput');
+    if (box) box.focus();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function bindTyping() {
+    const box = document.getElementById('tyInput');
+    if (box) {
+      box.addEventListener('input', () => {
+        const st = tyState;
+        if (!st || st.status !== 'playing') return;
+        const r = Typing.type(st, box.value);
+        if (!r.ok) return;
+        UI.typingSync(st);
+        const say = document.getElementById('tyStatus');
+        if (say) {
+          say.textContent = r.errors
+            ? r.errors + ' wrong key' + (r.errors === 1 ? '' : 's') + ' so far — ' +
+              Math.round(Typing.progress(st) * 100) + '% through'
+            : 'Clean so far — ' + Math.round(Typing.progress(st) * 100) + '% through';
+        }
+        if (st.status === 'done') leaveTypingScreen();
+      });
+      /* clicking the passage puts the carets back in the invisible box */
+      const wrap = document.getElementById('tyWrap');
+      if (wrap) wrap.addEventListener('click', () => box.focus());
+    }
+    const again = document.getElementById('tyNew');
+    if (again) again.addEventListener('click', () => startTyping(tyState ? tyState.level : tyLevel));
+  }
+
+  function leaveTypingScreen() {
+    clearTyTimers();
+    const screen = document.querySelector('.ty-screen');
+    if (!screen || reduceMotion) { finishTyping(); return; }
+    screen.classList.add('screen-leaving');
+    setTimeout(finishTyping, LEAVE_MS);
+  }
+
+  function finishTyping() {
+    const st = tyState;
+    if (!st) return;
+    st.elapsedMs = elapsedMs();
+    stopTimer();
+    const res = Typing.finish(st);
+    const me = mePlaying();
+    if (me) {
+      Store.recordGame(me.id, {
+        mode: 'typing',
+        difficulty: st.level,
+        points: res.points,
+        seconds: res.seconds,
+        correct: res.correct,
+        total: res.total,
+        speed: res.speed,
+        perfect: res.clean,
+        myScore: Math.round(res.wpm),
+        outcome: res.done ? 'win' : 'lose'
+      });
+    }
+    UI.typingResult(st, res);
+    animateScore(res.points);
+    if (res.done && res.clean) celebrate();
+    document.getElementById('tyAgainBtn').addEventListener('click', () => startTyping(st.level));
+    document.getElementById('homeBtn').addEventListener('click', showHome);
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  /* ---------------- Code Break ---------------- */
+
+  function showCodeBreakDifficulty() {
+    UI.codebreakDifficulty(cbLevel);
+    document.querySelectorAll('[data-cblevel]').forEach(card => {
+      card.addEventListener('click', () => {
+        cbLevel = card.dataset.cblevel;
+        showCodeBreakDifficulty();
+      });
+    });
+    document.getElementById('backHome').addEventListener('click', showHome);
+    document.getElementById('startBtn').addEventListener('click', () => startCodeBreak(cbLevel));
+  }
+
+  function startCodeBreak(level) {
+    cbState = CodeBreak.start(level);
+    cbLevel = cbState.level;
+    boardBusy = false;
+    UI.codebreakGame(cbState);
+    bindCodeBreak();
+    bindHome();
+    UI.codebreakSync(cbState);
+    startTimer();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function cbSay(text, bad) {
+    const el = document.getElementById('cbStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('nope');
+    if (bad && !reduceMotion) {
+      void el.offsetWidth;
+      el.classList.add('nope');
+    }
+  }
+
+  function cbDigit(d) {
+    const st = cbState;
+    if (!st || st.status !== 'playing') return;
+    if (!CodeBreak.typeDigit(st, d)) {
+      cbSay(st.repeats ? 'That row is full' : 'No repeats in this level, and that digit is already used', true);
+      return;
+    }
+    UI.codebreakSync(st);
+    cbSay(CodeBreak.filled(st) ? 'Ready — press Guess' : 'Keep going');
+  }
+
+  function cbBack() {
+    const st = cbState;
+    if (!st || st.status !== 'playing') return;
+    CodeBreak.backspace(st);
+    UI.codebreakSync(st);
+  }
+
+  function cbClearRow() {
+    const st = cbState;
+    if (!st || st.status !== 'playing') return;
+    CodeBreak.clearEntry(st);
+    UI.codebreakSync(st);
+  }
+
+  function cbSubmit() {
+    const st = cbState;
+    if (!st || st.status !== 'playing') return;
+    const r = CodeBreak.submit(st);
+    if (!r.ok) {
+      cbSay(r.why === 'short' ? 'Fill every slot first' : 'The game is over', true);
+      return;
+    }
+    UI.codebreakSync(st);
+    if (r.solved) {
+      cbSay('Cracked it!');
+      leaveCodeBreakScreen();
+      return;
+    }
+    if (r.lost) {
+      cbSay('Out of guesses');
+      leaveCodeBreakScreen();
+      return;
+    }
+    cbSay(r.row.bulls + ' in place · ' + r.row.cows + ' in the wrong place · ' +
+      (st.maxTries - st.rows.length) + ' guesses left');
+  }
+
+  function bindCodeBreak() {
+    const pad = document.getElementById('cbPad');
+    if (pad) {
+      pad.addEventListener('click', e => {
+        const key = e.target.closest('.cb-key');
+        if (!key) return;
+        if (key.dataset.cmd === 'back') cbBack();
+        else if (key.dataset.cmd === 'clear') cbClearRow();
+        else if (key.dataset.cmd === 'go') cbSubmit();
+        else cbDigit(Number(key.dataset.d));
+      });
+    }
+    const again = document.getElementById('cbNew');
+    if (again) again.addEventListener('click', () => startCodeBreak(cbState ? cbState.level : cbLevel));
+  }
+
+  function leaveCodeBreakScreen() {
+    const screen = document.querySelector('.cb-screen');
+    if (!screen || reduceMotion) { finishCodeBreak(); return; }
+    screen.classList.add('screen-leaving');
+    setTimeout(finishCodeBreak, LEAVE_MS);
+  }
+
+  function finishCodeBreak() {
+    const st = cbState;
+    if (!st) return;
+    st.elapsedMs = elapsedMs();
+    stopTimer();
+    const res = CodeBreak.finish(st);
+    const me = mePlaying();
+    if (me) {
+      Store.recordGame(me.id, {
+        mode: 'codebreak',
+        difficulty: st.level,
+        points: res.points,
+        seconds: res.seconds,
+        correct: res.solved ? res.guesses : 0,
+        total: res.maxTries,
+        speed: res.speed,
+        perfect: res.solved,
+        myScore: res.guesses,
+        outcome: res.solved ? 'win' : 'lose'
+      });
+    }
+    UI.codebreakResult(st, res);
+    animateScore(res.points);
+    if (res.solved) celebrate();
+    document.getElementById('cbAgainBtn').addEventListener('click', () => startCodeBreak(st.level));
+    document.getElementById('homeBtn').addEventListener('click', showHome);
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  /* ---------------- Word Ladder ---------------- */
+
+  const LA_WHY = {
+    length: 'That is the wrong number of letters',
+    same: 'That is the word you are already on',
+    used: 'You have already used that word',
+    change: 'Change exactly one letter',
+    unknown: 'That is not in the word list'
+  };
+
+  function showLadderDifficulty() {
+    UI.ladderDifficulty(laLevel);
+    document.querySelectorAll('[data-lalevel]').forEach(card => {
+      card.addEventListener('click', () => {
+        laLevel = card.dataset.lalevel;
+        showLadderDifficulty();
+      });
+    });
+    document.getElementById('backHome').addEventListener('click', showHome);
+    document.getElementById('startBtn').addEventListener('click', () => startLadder(laLevel));
+  }
+
+  function startLadder(level) {
+    laState = Ladder.start(level);
+    laLevel = laState.level;
+    boardBusy = false;
+    UI.ladderGame(laState);
+    bindLadder();
+    bindHome();
+    startTimer();
+    const box = document.getElementById('laInput');
+    if (box) box.focus();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  function laSay(text, bad) {
+    const el = document.getElementById('laStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('nope');
+    if (bad && !reduceMotion) {
+      void el.offsetWidth;
+      el.classList.add('nope');
+    }
+  }
+
+  function laPlay() {
+    const st = laState;
+    const box = document.getElementById('laInput');
+    if (!st || !box || st.status !== 'playing') return;
+    const r = Ladder.play(st, box.value);
+    if (!r.ok) { laSay(LA_WHY[r.why] || 'That word will not work', true); return; }
+    box.value = '';
+    UI.ladderSync(st);
+    if (r.solved) {
+      laSay('There it is — ' + r.steps + ' steps');
+      leaveLadderScreen();
+      return;
+    }
+    laSay('Good — ' + r.steps + ' step' + (r.steps === 1 ? '' : 's') +
+      ' so far, ' + st.par + ' is the par');
+  }
+
+  function laHint() {
+    const st = laState;
+    if (!st || st.status !== 'playing') return;
+    const r = Ladder.hint(st);
+    if (!r.ok) { laSay('Nothing sensible left from here', true); return; }
+    UI.ladderSync(st);
+    const box = document.getElementById('laInput');
+    if (box) box.value = '';
+    if (r.solved) { laSay('The hint finished it for you'); leaveLadderScreen(); return; }
+    laSay('Added ' + r.word + ' — a hint has been counted');
+  }
+
+  function laUndo() {
+    const st = laState;
+    if (!st || st.status !== 'playing') return;
+    if (!Ladder.undo(st)) { laSay('Nothing to undo', true); return; }
+    UI.ladderSync(st);
+    laSay('Took that rung back');
+  }
+
+  function bindLadder() {
+    const go = document.getElementById('laGo');
+    if (go) go.addEventListener('click', laPlay);
+    const box = document.getElementById('laInput');
+    if (box) box.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); laPlay(); }
+    });
+    const hint = document.getElementById('laHint');
+    if (hint) hint.addEventListener('click', laHint);
+    const undo = document.getElementById('laUndo');
+    if (undo) undo.addEventListener('click', laUndo);
+    const again = document.getElementById('laNew');
+    if (again) again.addEventListener('click', () => startLadder(laState ? laState.level : laLevel));
+  }
+
+  function leaveLadderScreen() {
+    const screen = document.querySelector('.la-screen');
+    if (!screen || reduceMotion) { finishLadder(); return; }
+    screen.classList.add('screen-leaving');
+    setTimeout(finishLadder, LEAVE_MS);
+  }
+
+  function finishLadder() {
+    const st = laState;
+    if (!st) return;
+    st.elapsedMs = elapsedMs();
+    stopTimer();
+    const res = Ladder.finish(st);
+    const me = mePlaying();
+    if (me) {
+      Store.recordGame(me.id, {
+        mode: 'ladder',
+        difficulty: st.level,
+        points: res.points,
+        seconds: res.seconds,
+        correct: res.steps,
+        total: res.par,
+        outcome: res.solved ? 'win' : 'lose',
+        perfect: res.optimal,
+        myScore: res.steps
+      });
+    }
+    UI.ladderResult(st, res);
+    animateScore(res.points);
+    if (res.optimal) celebrate();
+    document.getElementById('laAgainBtn').addEventListener('click', () => startLadder(st.level));
     document.getElementById('homeBtn').addEventListener('click', showHome);
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }

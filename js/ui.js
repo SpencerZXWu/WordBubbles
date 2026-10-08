@@ -16,11 +16,21 @@ const UI = (() => {
     wordstack: { name: 'Word Stack', score: 'words ' },
     tacta: { name: 'Tacta', score: 'dots ' },
     slide: { name: 'Number Slide', score: 'moves ' },
-    sudoku: { name: 'Sudoku', score: 'cells ' }
+    sudoku: { name: 'Sudoku', score: 'cells ' },
+    nonogram: { name: 'Nonogram', score: 'shaded ' },
+    g2048: { name: '2048', score: 'tile ' },
+    codebreak: { name: 'Code Break', score: 'guesses ' },
+    typing: { name: 'Typing Sprint', score: 'wpm ' },
+    ladder: { name: 'Word Ladder', score: 'steps ' }
   };
 
-  /* solo games that are filed by difficulty rather than by opponent */
-  const SOLO_PUZZLES = ['slide', 'sudoku'];
+  /* Solo games filed by difficulty rather than by opponent. Each entry names the
+     engine that owns its difficulty levels. */
+  const SOLO_ENGINES = {
+    slide: () => Slide, sudoku: () => Sudoku, nonogram: () => Nonogram,
+    g2048: () => G2048, codebreak: () => CodeBreak,
+    typing: () => Typing, ladder: () => Ladder
+  };
 
   /* Every game, in one place so a new one only has to be described once. */
   const MODES = {
@@ -28,14 +38,24 @@ const UI = (() => {
       desc: 'Fill the gaps in a short English passage.' },
     wordstack: { title: 'Word Stack', tag: '2 players',
       desc: 'Two players, overlap your word tiles letter by letter.' },
+    typing: { title: 'Typing Sprint', tag: '1 player',
+      desc: 'Solo, retype a passage as fast and as cleanly as you can.' },
+    ladder: { title: 'Word Ladder', tag: '1 player',
+      desc: 'Solo, change one letter at a time to reach the other word.' },
     math: { title: 'Math Duel', tag: '2 players',
       desc: 'Two players, cards and numbers, turn by turn.' },
     mine: { title: 'Minesweeper', tag: '1 player',
       desc: 'Solo, clear the grid without setting off a mine.' },
+    g2048: { title: '2048', tag: '1 player',
+      desc: 'Solo, slide and merge tiles until you reach the goal number.' },
+    codebreak: { title: 'Code Break', tag: '1 player',
+      desc: 'Solo, deduce the hidden number from the bulls and cows.' },
     slide: { title: 'Number Slide', tag: '1 player',
       desc: 'Solo, slide the numbers back into order in the frame.' },
     sudoku: { title: 'Sudoku', tag: '1 player',
       desc: 'Solo, fill the grid so every row, column and box holds 1-9.' },
+    nonogram: { title: 'Nonogram', tag: '1 player',
+      desc: 'Solo, read the line counts and shade the hidden picture.' },
     chess: { title: 'Chess', tag: '2 players',
       desc: 'Two players, a real board, turning each move.' },
     gomoku: { title: 'Gomoku', tag: '2 players',
@@ -50,10 +70,12 @@ const UI = (() => {
      kept working but pulled off the menu for now — put it back in the Board
      strategy list to unhide it. */
   const MODE_GROUPS = [
-    { name: 'Words', note: 'Reading, spelling and letter tiles.',
-      modes: ['words', 'wordstack'] },
-    { name: 'Numbers & logic', note: 'Arithmetic, deduction and puzzles.',
-      modes: ['math', 'mine', 'slide', 'sudoku'] },
+    { name: 'Words', note: 'Reading, spelling and typing.',
+      modes: ['words', 'wordstack', 'typing', 'ladder'] },
+    { name: 'Numbers & logic', note: 'Arithmetic, deduction and quick thinking.',
+      modes: ['math', 'mine', 'g2048', 'codebreak'] },
+    { name: 'Puzzles', note: 'Take your time and work it out.',
+      modes: ['slide', 'sudoku', 'nonogram'] },
     { name: 'Board strategy', note: 'Two players fighting over a shared board.',
       modes: ['chess', 'gomoku', 'go'] }
   ];
@@ -118,6 +140,8 @@ const UI = (() => {
   function homeLabel(mode) {
     return {
       chess: 'Start match', gomoku: 'Start match', go: 'Start game', mine: 'Start game',
+      g2048: 'Start game', codebreak: 'Start game', nonogram: 'Start game',
+      typing: 'Start game', ladder: 'Start game',
       wordstack: 'Start match', tacta: 'Start match', slide: 'Start game', sudoku: 'Start game'
     }[mode] || (mode === 'math' ? 'Start duel' : 'Continue');
   }
@@ -142,9 +166,9 @@ const UI = (() => {
     app().innerHTML =
       '<div class="screen">' +
         '<h1 class="page-title">WordBubbles</h1>' +
-        '<p class="page-sub">Nine minimal games, grouped by what they ask of you: fill in an ' +
-          'English passage or stack word tiles, duel with cards or clear a minefield, ' +
-          'work a puzzle, or settle it over a board of chess or stones.</p>' +
+        '<p class="page-sub">Fourteen small games, grouped by what they ask of you: ' +
+          'read and type, work with numbers and logic, settle in for a puzzle, or ' +
+          'fight it out over a board.</p>' +
         '<div class="section-label">Game mode</div>' +
         '<div class="mode-groups">' +
           MODE_GROUPS.map(g =>
@@ -1741,6 +1765,574 @@ const UI = (() => {
       '</div>';
   }
 
+  /* ---------------- nonogram ---------------- */
+
+  function nonogramDifficulty(selected) {
+    puzzleDiff('Nonogram',
+      'The numbers beside each row and above each column are the lengths of that ' +
+      'line\'s runs of shaded squares, in order. Shade the squares that satisfy ' +
+      'every clue at once. Every puzzle here can be finished by logic alone — ' +
+      'there is never any need to guess.',
+      Nonogram.LEVELS, selected, 'data-nglevel',
+      lv => lv.n + ' × ' + lv.n + ' · par ' + fmtTime(lv.par));
+  }
+
+  /* The grid, plus a clue strip on the top and left, has to fit the screen. */
+  function ngCell(st) {
+    const n = st.n;
+    const avail = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.6, 660);
+    return Math.max(13, Math.min(36, Math.floor(avail / (n + 2.4))));
+  }
+
+  function ngClue(list, cls, line) {
+    return '<div class="ng-clue ' + cls + '" data-line="' + line + '">' +
+      list.map(v => '<b>' + v + '</b>').join('') + '</div>';
+  }
+
+  function nonogramGame(st) {
+    const n = st.n, c = ngCell(st);
+    let top = '', left = '';
+    for (let i = 0; i < n; i++) top += ngClue(st.clues.cols[i], 'ng-clue-top', 'c' + i);
+    for (let i = 0; i < n; i++) left += ngClue(st.clues.rows[i], 'ng-clue-left', 'r' + i);
+    let cells = '';
+    for (let i = 0; i < n * n; i++) {
+      const col = i % n, row = (i / n) | 0;
+      let cls = 'ng-c';
+      if (col % 5 === 4 && col < n - 1) cls += ' c5';
+      if (row % 5 === 4 && row < n - 1) cls += ' r5';
+      cells += '<button class="' + cls + '" data-i="' + i + '"></button>';
+    }
+
+    app().innerHTML =
+      '<div class="screen ng-screen">' +
+        '<div class="mine-head">' +
+          '<div class="mine-stat"><b id="ngShaded">0</b><span>shaded</span></div>' +
+          '<button class="mine-face" id="ngNew" title="New picture" aria-label="New picture">↻</button>' +
+          '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
+        '</div>' +
+        '<div class="ng-wrap" id="ngWrap" style="--n:' + n + ';--c:' + c + 'px">' +
+          '<div class="ng-corner"></div>' +
+          '<div class="ng-top">' + top + '</div>' +
+          '<div class="ng-left">' + left + '</div>' +
+          '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
+        '</div>' +
+        '<div class="mine-foot">' +
+          '<span class="mine-level">' + n + ' × ' + n +
+            ' · par ' + fmtTime(st.par) + '</span>' +
+          '<button class="btn ghost" id="ngMode">Shade: on</button>' +
+          '<button class="btn ghost" id="ngClear">Clear marks</button>' +
+          HOME_BTN +
+        '</div>' +
+        '<div class="chess-status" id="ngStatus">Drag across squares to shade them. ' +
+          'Switch to the cross tool to note squares that must stay blank.</div>' +
+      '</div>';
+  }
+
+  function nonogramSync(st) {
+    const grid = document.getElementById('ngGrid');
+    if (!grid) return;
+    const states = Nonogram.lineStates(st);
+    const marks = st.marks;
+    for (let i = 0; i < marks.length; i++) {
+      const el = grid.children[i];
+      if (!el) continue;
+      const cls = 'ng-c' +
+        (marks[i] === Nonogram.FILLED ? ' on' : (marks[i] === Nonogram.EMPTY ? ' cross' : '')) +
+        ((i % st.n) % 5 === 4 && (i % st.n) < st.n - 1 ? ' c5' : '') +
+        ((((i / st.n) | 0) % 5) === 4 && ((i / st.n) | 0) < st.n - 1 ? ' r5' : '');
+      if (el.className !== cls) el.className = cls;
+    }
+    const wrap = document.getElementById('ngWrap');
+    if (wrap) {
+      for (let i = 0; i < st.n; i++) {
+        const col = wrap.querySelector('.ng-clue-top[data-line="c' + i + '"]');
+        if (col) {
+          col.classList.toggle('done', states.cols[i] === 'done');
+          col.classList.toggle('over', states.cols[i] === 'over');
+        }
+        const row = wrap.querySelector('.ng-clue-left[data-line="r' + i + '"]');
+        if (row) {
+          row.classList.toggle('done', states.rows[i] === 'done');
+          row.classList.toggle('over', states.rows[i] === 'over');
+        }
+      }
+    }
+    const sh = document.getElementById('ngShaded');
+    if (sh) sh.textContent = String(Nonogram.filledCount(st));
+    const mb = document.getElementById('ngMode');
+    if (mb) mb.textContent = st.mode === 'mark' ? 'Shade: off (crosses)' : 'Shade: on';
+  }
+
+  function nonogramResult(st, res) {
+    app().innerHTML =
+      '<div class="screen board-result">' +
+        '<div class="score-hero">' +
+          '<div class="score-num" id="scoreNum">+0</div>' +
+          '<div class="score-label">' + (res.solved
+            ? 'Solved — ' + esc(res.label) + ' in ' + esc(fmtTime(res.seconds))
+            : 'Not finished yet') + '</div>' +
+          '<div class="score-breakdown">' + res.base + ' base × ' + res.speed.toFixed(2) +
+            ' speed · par ' + fmtTime(res.par) + '</div>' +
+        '</div>' +
+        '<div class="stats three">' +
+          '<div class="stat" style="--i:0"><div class="v">' + res.n + ' × ' + res.n +
+            '</div><div class="k">Picture size</div></div>' +
+          '<div class="stat" style="--i:1"><div class="v">' + fmtTime(res.seconds) +
+            '</div><div class="k">Time</div></div>' +
+          '<div class="stat" style="--i:2"><div class="v">' + res.shaded + '/' + res.total +
+            '</div><div class="k">Squares shaded</div></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn primary" id="ngAgainBtn">Play again</button>' +
+          '<button class="btn ghost" id="homeBtn">Home</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------------- 2048 ---------------- */
+
+  function g2048Difficulty(selected) {
+    puzzleDiff('2048',
+      'Swipe or use the arrow keys. Every tile slides as far as it can, and two ' +
+      'equal numbers that meet merge into their sum. One new tile appears after ' +
+      'each move — get to the goal tile before the grid jams.',
+      G2048.LEVELS, selected, 'data-g8level',
+      lv => lv.label + ' · goal ' + lv.goal);
+  }
+
+  /* Grey steps for the tile ramp: small numbers stay light, big ones go black.
+     The value is always printed, so nothing depends on the shade alone. */
+  function g2048Tier(v) {
+    const steps = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+    const i = steps.indexOf(v);
+    return i < 0 ? 11 : i + 1;
+  }
+
+  function g2048Game(st) {
+    let cells = '';
+    for (let i = 0; i < st.board.length; i++) cells += '<div class="g8-c" data-i="' + i + '"></div>';
+    app().innerHTML =
+      '<div class="screen g8-screen">' +
+        '<div class="mine-head">' +
+          '<div class="mine-stat"><b id="g8Score">0</b><span>score</span></div>' +
+          '<button class="mine-face" id="g8New" title="New grid" aria-label="New grid">↻</button>' +
+          '<div class="mine-stat"><b id="g8Best">0</b><span>biggest · goal ' + st.goal + '</span></div>' +
+        '</div>' +
+        '<div class="g8-wrap" id="g8Wrap">' +
+          '<div class="g8-grid" id="g8Grid" style="--n:' + st.n + '">' + cells + '</div>' +
+        '</div>' +
+        '<div class="mine-foot">' +
+          '<span class="mine-level">' + esc(st.label) + ' · goal ' + st.goal +
+            ' · ' + st.moves + ' moves</span>' +
+          '<button class="btn ghost" id="g8Up">↑</button>' +
+          '<button class="btn ghost" id="g8Down">↓</button>' +
+          '<button class="btn ghost" id="g8Left">←</button>' +
+          '<button class="btn ghost" id="g8Right">→</button>' +
+          HOME_BTN +
+        '</div>' +
+        '<div class="chess-status" id="g8Status">Swipe the grid, or use the arrow keys ' +
+          'or the buttons below.</div>' +
+      '</div>';
+  }
+
+  function g2048Sync(st, res) {
+    const grid = document.getElementById('g8Grid');
+    if (!grid) return;
+    for (let i = 0; i < st.board.length; i++) {
+      const el = grid.children[i];
+      if (!el) continue;
+      const v = st.board[i];
+      const txt = v ? String(v) : '';
+      const cls = 'g8-c' + (v ? ' t' + g2048Tier(v) : '') +
+        (res && res.merged && res.merged.indexOf(i) >= 0 ? ' merge' : '') +
+        (res && res.spawned === i ? ' new' : '');
+      if (el.textContent !== txt) el.textContent = txt;
+      if (el.className !== cls) el.className = cls;
+    }
+    const sc = document.getElementById('g8Score');
+    if (sc) sc.textContent = String(st.score);
+    const bs = document.getElementById('g8Best');
+    if (bs) bs.textContent = String(G2048.bestTile(st));
+    const mv = document.querySelector('.g8-screen .mine-level');
+    if (mv) {
+      mv.textContent = st.label + ' · goal ' + st.goal + ' · ' + st.moves + ' moves';
+    }
+  }
+
+  function g2048Result(st, res) {
+    app().innerHTML =
+      '<div class="screen board-result">' +
+        '<div class="score-hero">' +
+          '<div class="score-num" id="scoreNum">+0</div>' +
+          '<div class="score-label">' + (res.solved
+            ? 'Reached ' + res.best + ' — ' + esc(res.label)
+            : 'Jammed at ' + res.best + ' of ' + res.goal) + '</div>' +
+          '<div class="score-breakdown">' + res.base + ' base × ' +
+            Math.min(1, res.best / res.goal).toFixed(2) + ' of the goal' +
+            (res.clearBonus ? ' +' + res.clearBonus + ' cleared' : '') +
+            '</div>' +
+        '</div>' +
+        '<div class="stats three">' +
+          '<div class="stat" style="--i:0"><div class="v">' + res.best +
+            '</div><div class="k">Biggest tile</div></div>' +
+          '<div class="stat" style="--i:1"><div class="v">' + res.moves +
+            '</div><div class="k">Moves</div></div>' +
+          '<div class="stat" style="--i:2"><div class="v">' + res.merges +
+            '</div><div class="k">Merges</div></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn primary" id="g8AgainBtn">Play again</button>' +
+          '<button class="btn ghost" id="homeBtn">Home</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------------- typing sprint ---------------- */
+
+  function typingDifficulty(selected) {
+    puzzleDiff('Typing Sprint',
+      'Retype the passage exactly as it is written. A character goes dark when ' +
+      'you get it right and red when you do not. Your score comes from words per ' +
+      'minute against the level target, plus a bonus for a completely clean run. ' +
+      'The passages are the same ones Word Fill uses.',
+      Typing.LEVELS, selected, 'data-tylevel',
+      lv => 'target ' + lv.wpm + ' wpm');
+  }
+
+  /* One span per character so a single wrong key can be marked. */
+  function typingChars(st) {
+    const target = st.target;
+    const typed = st.typed;
+    let out = '';
+    for (let i = 0; i < target.length; i++) {
+      let cls = 'ty-ch';
+      if (i < typed.length) cls += typed[i] === target[i] ? ' ok' : ' bad';
+      else if (i === typed.length) cls += ' next';
+      /* a plain space, NOT &nbsp; — a non-breaking space would stop the whole
+         passage from ever wrapping onto a second line */
+      const ch = target[i] === '&' ? '&amp;' : (target[i] === '<' ? '&lt;' : target[i]);
+      out += '<span class="' + cls + '">' + ch + '</span>';
+    }
+    return out;
+  }
+
+  function typingGame(st) {
+    app().innerHTML =
+      '<div class="screen ty-screen">' +
+        '<div class="mine-head">' +
+          '<div class="mine-stat"><b id="tyWpm">0</b><span>words / min</span></div>' +
+          '<button class="mine-face" id="tyNew" title="Another passage" aria-label="Another passage">↻</button>' +
+          '<div class="mine-stat"><b id="tyAcc">100%</b><span>accuracy</span></div>' +
+        '</div>' +
+        '<h2 class="ty-title">' + esc(st.title) + '</h2>' +
+        '<div class="ty-wrap" id="tyWrap">' +
+          '<p class="ty-text" id="tyText">' + typingChars(st) + '</p>' +
+          '<textarea class="ty-input" id="tyInput" autocomplete="off" autocapitalize="off" ' +
+            'autocorrect="off" spellcheck="false" aria-label="Type the passage"></textarea>' +
+        '</div>' +
+        '<div class="progress-bar"><i id="tyBar" style="width:0%"></i></div>' +
+        '<div class="mine-foot">' +
+          '<span class="mine-level">' + esc(st.label) + ' · target ' + st.wpmTarget +
+            ' wpm · ' + st.target.length + ' characters</span>' +
+          '<span class="mine-level" id="timer">0:00</span>' +
+          HOME_BTN +
+        '</div>' +
+        '<div class="chess-status" id="tyStatus">Start typing — the box is already focused.</div>' +
+      '</div>';
+  }
+
+  function typingSync(st) {
+    const text = document.getElementById('tyText');
+    if (text) text.innerHTML = typingChars(st);
+    const bar = document.getElementById('tyBar');
+    if (bar) bar.style.width = (Typing.progress(st) * 100).toFixed(1) + '%';
+    const live = Typing.live(st, st.elapsedMs || 0);
+    const w = document.getElementById('tyWpm');
+    if (w) w.textContent = String(Math.round(live.wpm));
+    const a = document.getElementById('tyAcc');
+    if (a) a.textContent = Math.round(live.accuracy * 100) + '%';
+    /* keep the caret in view on a long passage */
+    const wrap = document.getElementById('tyWrap');
+    const next = text && text.querySelector('.ty-ch.next');
+    if (wrap && next) {
+      const r = next.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      if (r.top < wr.top + 8 || r.bottom > wr.bottom - 8) {
+        wrap.scrollTop += r.top - wr.top - wrap.clientHeight / 2;
+      }
+    }
+  }
+
+  function typingResult(st, res) {
+    app().innerHTML =
+      '<div class="screen board-result">' +
+        '<div class="score-hero">' +
+          '<div class="score-num" id="scoreNum">+0</div>' +
+          '<div class="score-label">' + (res.done
+            ? Math.round(res.wpm) + ' wpm at ' + Math.round(res.accuracy * 100) + '% accuracy'
+            : 'Not finished yet') + '</div>' +
+          '<div class="score-breakdown">' + res.base + ' base × ' + res.speed.toFixed(2) +
+            ' speed (target ' + res.wpmTarget + ' wpm)' +
+            (res.clean ? ' +20 clean' : '') + '</div>' +
+        '</div>' +
+        '<div class="stats three">' +
+          '<div class="stat" style="--i:0"><div class="v">' + fmtTime(res.seconds) +
+            '</div><div class="k">Time</div></div>' +
+          '<div class="stat" style="--i:1"><div class="v">' + res.correct + '/' + res.total +
+            '</div><div class="k">Characters right</div></div>' +
+          '<div class="stat" style="--i:2"><div class="v">' + res.errors +
+            '</div><div class="k">Wrong keys</div></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn primary" id="tyAgainBtn">Another passage</button>' +
+          '<button class="btn ghost" id="homeBtn">Home</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------------- code break ---------------- */
+
+  function codebreakDifficulty(selected) {
+    puzzleDiff('Code Break',
+      'A secret code hides behind the dashes. Every guess is answered with two ' +
+      'counts: how many digits are the right number in the right place, and how ' +
+      'many are the right number in the wrong place. Work the code out before ' +
+      'your guesses run out.',
+      CodeBreak.LEVELS, selected, 'data-cblevel',
+      lv => lv.len + ' digits · ' + lv.tries + ' guesses');
+  }
+
+  function cbPegs(row) {
+    let out = '';
+    for (let i = 0; i < row.bulls; i++) out += '<i class="cb-peg bull"></i>';
+    for (let i = 0; i < row.cows; i++) out += '<i class="cb-peg cow"></i>';
+    const spare = Math.max(0, row.guess.length - row.bulls - row.cows);
+    for (let i = 0; i < spare; i++) out += '<i class="cb-peg none"></i>';
+    return out;
+  }
+
+  function codebreakGame(st) {
+    let rows = '';
+    for (let i = 0; i < st.maxTries; i++) {
+      const r = st.rows[i];
+      rows += '<div class="cb-row' + (i === st.rows.length ? ' current' : '') + '">' +
+        '<span class="cb-no">' + (i + 1) + '</span>' +
+        '<span class="cb-digits">' + (r
+          ? r.guess.map(d => '<b>' + d + '</b>').join('')
+          : (i === st.rows.length
+            ? st.entry.map(d => '<b' + (d < 0 ? ' class="blank"' : '') + '>' + (d < 0 ? '' : d) + '</b>').join('')
+            : '<b class="blank"></b>'.repeat(st.len))) + '</span>' +
+        '<span class="cb-pegs">' + (r ? cbPegs(r) : '') + '</span>' +
+        '</div>';
+    }
+    let pad = '';
+    for (let d = 0; d < st.alphabet; d++) pad += '<button class="cb-key" data-d="' + d + '">' + d + '</button>';
+    pad += '<button class="cb-key" data-cmd="back" title="Backspace">⌫</button>';
+    pad += '<button class="cb-key wide" data-cmd="clear" title="Clear the row">Clear</button>';
+    pad += '<button class="cb-key go" data-cmd="go" title="Submit (Enter)">Guess</button>';
+
+    app().innerHTML =
+      '<div class="screen cb-screen">' +
+        '<div class="mine-head">' +
+          '<div class="mine-stat"><b id="cbLeft">' + st.maxTries + '</b><span>guesses left</span></div>' +
+          '<button class="mine-face" id="cbNew" title="New code" aria-label="New code">↻</button>' +
+          '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
+        '</div>' +
+        '<div class="cb-wrap">' +
+          '<div class="cb-rows" id="cbRows">' + rows + '</div>' +
+          '<div class="cb-side">' +
+            '<div class="cb-pad" id="cbPad">' + pad + '</div>' +
+            '<div class="cb-legend">' +
+              '<span><i class="cb-peg bull"></i> right digit, right place</span>' +
+              '<span><i class="cb-peg cow"></i> right digit, wrong place</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mine-foot">' +
+          '<span class="mine-level">' + st.len + ' slots · digits 0-' + (st.alphabet - 1) +
+            (st.repeats ? ' · repeats allowed' : ' · no repeats') + '</span>' +
+          HOME_BTN +
+        '</div>' +
+        '<div class="chess-status" id="cbStatus">Type digits or tap the pad, then Guess.</div>' +
+      '</div>';
+  }
+
+  function codebreakSync(st) {
+    const wrap = document.getElementById('cbRows');
+    if (wrap) {
+      for (let i = 0; i < st.maxTries; i++) {
+        const row = wrap.children[i];
+        if (!row) continue;
+        row.classList.toggle('current', i === st.rows.length && st.status === 'playing');
+        row.classList.toggle('done', i < st.rows.length);
+        const r = st.rows[i];
+        const digits = row.querySelector('.cb-digits');
+        if (digits) {
+          if (r) {
+            const html = r.guess.map(d => '<b>' + d + '</b>').join('');
+            if (digits.innerHTML !== html) digits.innerHTML = html;
+          } else if (i === st.rows.length) {
+            const html = st.entry.map((d, k) =>
+              '<b' + (d < 0 ? ' class="blank"' + (k === st.cursor ? ' data-cursor="1"' : '') : '') + '>' +
+              (d < 0 ? '' : d) + '</b>').join('');
+            if (digits.innerHTML !== html) digits.innerHTML = html;
+          }
+        }
+        const pegs = row.querySelector('.cb-pegs');
+        if (pegs) {
+          const html = r ? cbPegs(r) : '';
+          if (pegs.innerHTML !== html) pegs.innerHTML = html;
+        }
+      }
+    }
+    const left = document.getElementById('cbLeft');
+    if (left) left.textContent = String(st.maxTries - st.rows.length);
+    const gone = CodeBreak.ruledOut(st);
+    const pad = document.getElementById('cbPad');
+    if (pad) {
+      Array.prototype.forEach.call(pad.children, b => {
+        const d = Number(b.dataset.d);
+        if (b.dataset.d == null || b.dataset.d === '') return;
+        b.classList.toggle('gone', !!gone[d]);
+      });
+    }
+  }
+
+  function codebreakResult(st, res) {
+    const secret = res.secret.map(d => '<b>' + d + '</b>').join('');
+    app().innerHTML =
+      '<div class="screen board-result">' +
+        '<div class="score-hero">' +
+          '<div class="score-num" id="scoreNum">+0</div>' +
+          '<div class="score-label">' + (res.solved
+            ? 'Cracked it in ' + res.guesses + (res.guesses === 1 ? ' guess' : ' guesses')
+            : 'Out of guesses — the code was') + '</div>' +
+          '<div class="cb-reveal">' + secret + '</div>' +
+          '<div class="score-breakdown">' + (res.solved
+            ? res.base + ' base × ' + res.speed.toFixed(2) + ' speed +' + res.spareBonus + ' spare guesses'
+            : 'no points this time — scores are only ever added') + '</div>' +
+        '</div>' +
+        '<div class="stats three">' +
+          '<div class="stat" style="--i:0"><div class="v">' + res.guesses + '/' + res.maxTries +
+            '</div><div class="k">Guesses used</div></div>' +
+          '<div class="stat" style="--i:1"><div class="v">' + fmtTime(res.seconds) +
+            '</div><div class="k">Time</div></div>' +
+          '<div class="stat" style="--i:2"><div class="v">' + res.len +
+            '</div><div class="k">Digits</div></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn primary" id="cbAgainBtn">Play again</button>' +
+          '<button class="btn ghost" id="homeBtn">Home</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------------- word ladder ---------------- */
+
+  function ladderDifficulty(selected) {
+    puzzleDiff('Word Ladder',
+      'Turn the first word into the last one, changing exactly one letter at a ' +
+      'time. Every rung in between has to be a real word. Walk it in as few steps ' +
+      'as the puzzle allows to keep the bonus.',
+      Ladder.LEVELS, selected, 'data-lalevel',
+      lv => lv.n + ' letters · ' + lv.minPath + '-' + lv.maxPath + ' steps');
+  }
+
+  const ladderCur = st => st.ladder[st.ladder.length - 1];
+
+  function ladderGame(st) {
+    app().innerHTML =
+      '<div class="screen la-screen">' +
+        '<div class="mine-head">' +
+          '<div class="mine-stat"><b id="laSteps">0</b><span>steps</span></div>' +
+          '<button class="mine-face" id="laNew" title="New ladder" aria-label="New ladder">↻</button>' +
+          '<div class="mine-stat"><b id="laPar">' + st.par + '</b><span>fewest possible</span></div>' +
+        '</div>' +
+        '<div class="la-goal">' +
+          '<span class="la-word start">' + esc(st.startWord) + '</span>' +
+          '<span class="la-arrow">→</span>' +
+          '<span class="la-word target">' + esc(st.target) + '</span>' +
+        '</div>' +
+        '<div class="la-wrap">' +
+          '<div class="la-rungs" id="laRungs"></div>' +
+          '<div class="la-entry">' +
+            '<input class="la-input" id="laInput" type="text" autocomplete="off" ' +
+              'autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+              'maxlength="' + st.size + '" placeholder="' + st.size + ' letters" ' +
+              'aria-label="Your next word" />' +
+            '<button class="btn primary" id="laGo">Add</button>' +
+            '<button class="btn ghost" id="laHint">Hint</button>' +
+            '<button class="btn ghost" id="laUndo">Undo</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mine-foot">' +
+          '<span class="mine-level">' + st.size + ' letters · par ' + st.par +
+            ' steps · ' + esc(st.startWord) + ' to ' + esc(st.target) + '</span>' +
+          '<span class="mine-level" id="timer">0:00</span>' +
+          HOME_BTN +
+        '</div>' +
+        '<div class="chess-status" id="laStatus">Change one letter, and every rung ' +
+          'must be a real word.</div>' +
+      '</div>';
+    ladderSync(st);
+  }
+
+  function ladderSync(st) {
+    const box = document.getElementById('laRungs');
+    if (!box) return;
+    /* newest rung on top; the changed letter is picked out against the rung below */
+    const rev = st.ladder.slice().reverse();
+    const html = rev.map((w, k) => {
+      const prev = rev[k + 1];
+      let letters = '';
+      for (let i = 0; i < st.size; i++) {
+        letters += (prev && prev[i] !== w[i])
+          ? '<b>' + esc(w[i]) + '</b>'
+          : '<span>' + esc(w[i]) + '</span>';
+      }
+      return '<div class="la-rung' + (k === 0 ? ' current' : '') +
+        (w === st.target ? ' target' : '') +
+        (w === st.startWord ? ' start' : '') + '">' + letters + '</div>';
+    }).join('');
+    if (box.innerHTML !== html) box.innerHTML = html;
+    const steps = document.getElementById('laSteps');
+    if (steps) steps.textContent = String(st.ladder.length - 1);
+  }
+
+  function ladderResult(st, res) {
+    app().innerHTML =
+      '<div class="screen board-result">' +
+        '<div class="score-hero">' +
+          '<div class="score-num" id="scoreNum">+0</div>' +
+          '<div class="score-label">' + (res.solved
+            ? esc(res.startWord) + ' to ' + esc(res.target) + ' in ' + res.steps + ' steps'
+            : 'Not finished yet') + '</div>' +
+          '<div class="score-breakdown">' + res.base + ' base × ' +
+            Math.min(1, res.par / Math.max(res.par, res.steps)).toFixed(2) + ' of the par chain' +
+            (res.optimal ? ' +30 shortest possible' : '') +
+            (res.hints ? ' · ' + res.hints + ' hint' + (res.hints === 1 ? '' : 's') : '') +
+            '</div>' +
+        '</div>' +
+        '<div class="la-final">' + res.ladder.map((w, i) =>
+          '<span class="la-word' + (i === 0 ? ' start' : '') +
+          (i === res.ladder.length - 1 ? ' target' : '') + '">' + esc(w) + '</span>' +
+          (i < res.ladder.length - 1 ? '<span class="la-arrow">→</span>' : '')
+        ).join('') + '</div>' +
+        '<div class="stats three">' +
+          '<div class="stat" style="--i:0"><div class="v">' + res.steps + '/' + res.par +
+            '</div><div class="k">Steps vs par</div></div>' +
+          '<div class="stat" style="--i:1"><div class="v">' + fmtTime(res.seconds) +
+            '</div><div class="k">Time</div></div>' +
+          '<div class="stat" style="--i:2"><div class="v">' + res.hints +
+            '</div><div class="k">Hints used</div></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="btn primary" id="laAgainBtn">Play again</button>' +
+          '<button class="btn ghost" id="homeBtn">Home</button>' +
+        '</div>' +
+      '</div>';
+  }
+
   /* ---------------- player history ---------------- */
   function historyModal(player) {
     const root = document.getElementById('modalRoot');
@@ -1757,9 +2349,9 @@ const UI = (() => {
                 '<span>' + g.correct + '/' + g.total + ' · ' + fmtTime(g.seconds) + '</span></div>' +
               '</div>';
           }
-          if (SOLO_PUZZLES.indexOf(g.mode) >= 0) {
-            const lv = (g.mode === 'slide' ? Slide.cfgOf(g.difficulty) : Sudoku.cfgOf(g.difficulty));
+          if (SOLO_ENGINES[g.mode]) {
             const info = HIST_MODES[g.mode];
+            const lv = SOLO_ENGINES[g.mode]().cfgOf(g.difficulty);
             return '<div class="hrow">' +
               '<div class="hrow-main">' + esc(info.name) + ' · ' + esc(lv.label) + '</div>' +
               '<div class="hrow-sub">' + esc(shortDate(g.at)) + ' · ' +
@@ -1879,6 +2471,11 @@ const UI = (() => {
     mineDifficulty, mineGame, mineSync, mineResult,
     slideDifficulty, slideGame, slideSync, slideResult,
     sudokuDifficulty, sudokuGame, sudokuSync, sudokuResult,
+    nonogramDifficulty, nonogramGame, nonogramSync, nonogramResult,
+    g2048Difficulty, g2048Game, g2048Sync, g2048Result,
+    typingDifficulty, typingGame, typingSync, typingResult,
+    codebreakDifficulty, codebreakGame, codebreakSync, codebreakResult,
+    ladderDifficulty, ladderGame, ladderSync, ladderResult,
     wordstackSetup, wordstackGame, wsPaint, wsPreview, wsTrays, wsTurn, wordstackResult,
     tactaGame, tactaPaint, tactaTrays, tactaTurn, tactaResult, tactaCardSvg,
     esc, fmtTime, fmtDuration };
