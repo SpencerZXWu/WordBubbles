@@ -2426,36 +2426,64 @@ const App = (() => {
   function stageBox() {
     const el = document.getElementById('stage');
     if (!el) return null;
+    /* measure what the flex column can give, not the floor an earlier fit left
+       behind — otherwise every resize would let the board creep a size bigger */
+    el.style.minHeight = '';
     const r = el.getBoundingClientRect();
     if (r.width < 60 || r.height < 60) return null;
-    return { w: r.width - 4, h: r.height - 4 };
+    return { w: r.width - 4, h: r.height - 4, el: el };
   }
 
   const clampTo = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* A board may be allowed to run past the stage it was measured in. When it
+     does, the stage has to grow to match — otherwise the board simply paints
+     over the buttons underneath it. Measuring the board forces one layout,
+     which is cheap enough for something that runs on start and on resize. */
+  function growStage(box, board, extra) {
+    if (!box || !box.el || !board) return;
+    const h = board.getBoundingClientRect().height;
+    if (h > 0) box.el.style.minHeight = Math.round(h + (extra || 0)) + 'px';
+  }
+
+  /* Whole-pixel cells. A board whose cells land on fractional pixels puts each
+     box-shadow grid line at a different sub-pixel offset, so some snap to two
+     device pixels and others to one — which reads as random bolding. Dividing
+     the space into whole cells fixes it, so every fit works in cell sizes and
+     derives the board side from that.
+
+     `chrome` is the board's own padding + gaps + border, which box-sizing
+     counts inside the side. */
+  const boardSide = (avail, n, chrome, loCell, hiCell) =>
+    clampTo(Math.floor((avail - chrome) / n), loCell, hiCell) * n + chrome;
 
   function g8Fit() {
     const grid = document.getElementById('g8Grid');
     const box = stageBox();
     if (!grid || !box || !g8State) return;
-    /* a square board may borrow a little height back from the chrome, which is
-       worth far more to the player than a screen that never scrolls */
-    const size = clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 200, 760);
+    const n = g8State.n;
+    const size = boardSide(Math.min(box.w, box.h * 1.15), n, 6 * n + 10, 44, 188);
     grid.style.setProperty('--size', size + 'px');
-    grid.style.setProperty('--g8-font', Math.round(size / g8State.n * 0.44) + 'px');
+    grid.style.setProperty('--g8-font', Math.round((size - 6 * n - 10) / n * 0.44) + 'px');
+    growStage(box, grid);
   }
 
   function suFit() {
     const grid = document.getElementById('suGrid');
+    const body = document.querySelector('.su-body');
     const box = stageBox();
     if (!grid || !box) return;
-    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.15)), 220, 700) + 'px');
+    grid.style.setProperty('--size', boardSide(Math.min(box.w, box.h * 1.1), 9, 4, 24, 78) + 'px');
+    growStage(box, body || grid);
   }
 
   function slideFit() {
     const grid = document.getElementById('slideGrid');
     const box = stageBox();
     if (!grid || !box) return;
-    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 220, 720) + 'px');
+    const n = (slideState && slideState.n) || 4;
+    grid.style.setProperty('--size', boardSide(Math.min(box.w, box.h * 1.15), n, 3, 52, 150) + 'px');
+    growStage(box, grid);
   }
 
   function ngFit() {
@@ -2464,8 +2492,9 @@ const App = (() => {
     if (!wrap || !box || !ngState) return;
     const n = ngState.n;
     /* the clue strips take about 2.4 cells, plus the gap that separates them */
-    const c = clampTo(Math.floor(Math.min(box.w / (n + 2.7), box.h * 1.15 / (n + 2.7))), 11, 48);
+    const c = clampTo(Math.floor(Math.min(box.w / (n + 2.7), box.h * 1.1 / (n + 2.7))), 11, 48);
     wrap.style.setProperty('--c', c + 'px');
+    growStage(box, wrap);
   }
 
   function mineFit() {
@@ -2473,10 +2502,11 @@ const App = (() => {
     const box = stageBox();
     if (!grid || !box || !mineState) return;
     /* readable cells matter more here than a screen that fits, and a wide grid
-       has spare width to spend, so let it run a little past the stage height */
+       has spare width to spend, so let it run further past the stage height */
     const c = clampTo(Math.floor(Math.min(box.w / mineState.cols,
-      box.h * 1.55 / mineState.rows) - 2), 18, 34);
+      box.h * 1.45 / mineState.rows) - 2), 18, 34);
     grid.style.setProperty('--cell', c + 'px');
+    growStage(box, grid);
   }
 
   function fitActiveGame() {

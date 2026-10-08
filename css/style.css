@@ -159,9 +159,6 @@ a { color: inherit; }
   display: flex; flex-direction: column; gap: 10px;
   min-height: calc(100vh - var(--topbar-h) - 84px);
   min-height: calc(100dvh - var(--topbar-h) - 84px);
-  /* never taller than the viewport, or a big board pushes the chrome off screen */
-  max-height: calc(100vh - var(--topbar-h) - 92px);
-  max-height: calc(100dvh - var(--topbar-h) - 92px);
 }
 .game-stage {
   flex: 1 1 auto; min-height: 52vh; width: 100%;
@@ -954,7 +951,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 .slide-grid {
   position: relative; flex: 0 0 auto;
   width: var(--size, 360px); height: var(--size, 360px);
-  border: 1.5px solid var(--line-soft); border-radius: 14px;
+  border: 2px solid var(--line-soft); border-radius: 14px;
   background: var(--soft); overflow: hidden;
 }
 .slide-tile {
@@ -1001,10 +998,13 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   box-shadow: inset -1px -1px 0 var(--line-soft);
   transition: background .12s var(--ease), color .12s var(--ease);
 }
-/* the box walls: thicker than the square grid inside each 3 x 3 block */
-.su-c.br { box-shadow: inset -2px -1px 0 var(--fg); }
-.su-c.bb { box-shadow: inset -1px -2px 0 var(--fg); }
-.su-c.br.bb { box-shadow: inset -2px -2px 0 var(--fg); }
+/* the box walls: thicker than the square grid inside each 3 x 3 block.
+   Each edge gets its own shadow — writing `inset -2px -1px 0` paints BOTH the
+   right and the bottom edge in the wall colour, so every cell in columns 3 and
+   6 grew a stray dark line under it. */
+.su-c.br { box-shadow: inset -2px 0 0 var(--fg), inset 0 -1px 0 var(--line-soft); }
+.su-c.bb { box-shadow: inset -1px 0 0 var(--line-soft), inset 0 -2px 0 var(--fg); }
+.su-c.br.bb { box-shadow: inset -2px 0 0 var(--fg), inset 0 -2px 0 var(--fg); }
 .su-c.entry { animation: cellIn .18s var(--ease) both; }
 @keyframes cellIn { from { scale: .78; opacity: .35; } to { scale: 1; opacity: 1; } }
 .su-c.given { font-weight: 800; }
@@ -1068,10 +1068,13 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   touch-action: none; box-shadow: inset -1px -1px 0 var(--line-soft);
   transition: background .1s var(--ease);
 }
-/* faint guide lines every five squares, like a printed puzzle */
-.ng-c.c5 { box-shadow: inset -2px -1px 0 var(--fg); }
-.ng-c.r5 { box-shadow: inset -1px -2px 0 var(--fg); }
-.ng-c.c5.r5 { box-shadow: inset -2px -2px 0 var(--fg); }
+/* Faint guide lines every five squares, like a printed puzzle. Same trap as the
+   sudoku walls: one shadow per edge, or the pairing leaks the guide colour onto
+   the edge that runs at right angles to it. A mid grey also keeps them quieter
+   than the 2px black frame instead of competing with it. */
+.ng-c.c5 { box-shadow: inset -2px 0 0 var(--muted), inset 0 -1px 0 var(--line-soft); }
+.ng-c.r5 { box-shadow: inset -1px 0 0 var(--line-soft), inset 0 -2px 0 var(--muted); }
+.ng-c.c5.r5 { box-shadow: inset -2px 0 0 var(--muted), inset 0 -2px 0 var(--muted); }
 .ng-c.on { background: var(--fg); }
 .ng-c.cross::after {
   content: '×'; position: absolute; inset: 0;
@@ -1130,7 +1133,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   grid-template-rows: repeat(var(--n), minmax(0, 1fr));
   width: var(--size, 320px); height: var(--size, 320px); flex: 0 0 auto;
   gap: var(--g8-gap); padding: var(--g8-gap); border-radius: 14px;
-  background: var(--soft); border: 1.5px solid var(--line-soft);
+  background: var(--soft); border: 2px solid var(--line-soft);
 }
 /* The D-pad: four chevrons drawn with borders, which stay crisp next to the
    mono type in a way the ↑ ↓ ← → glyphs never did. */
