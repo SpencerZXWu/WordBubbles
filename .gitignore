@@ -4,6 +4,9 @@ desktop.ini
 .DS_Store
 *.log
 
+# editor task definitions (hold machine-specific paths and a local proxy port)
+.vscode/
+
 # scratch files used while testing (screenshots, one-off validation scripts)
 _*.js
 _*.png
