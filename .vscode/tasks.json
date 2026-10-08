@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "commit and push",
+			"type": "shell",
+			"command": "git add -A; git commit -m \"Sudoku: make all three levels easier (47/39/33 printed numbers)\"; git push origin main; echo '--- log ---'; git log --oneline -2; git status -sb",
+			"isBackground": false
+		},
+		{
+			"label": "commit and push sudoku",
+			"type": "shell",
+			"command": "git add -A; git commit -F .git/WB_MSG; git push origin main; echo '--- log ---'; git log --oneline -2; echo '--- status ---'; git status -sb; echo '--- remote ---'; git ls-remote --heads origin",
+			"isBackground": false
+		}
+	]
+}

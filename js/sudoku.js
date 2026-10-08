@@ -11,14 +11,15 @@ const Sudoku = (() => {
   const MIN_SPEED = 0.5, MAX_SPEED = 1.6, MAX_POINTS = 300, CLEAN_BONUS = 20;
 
   /* `clues` is how many numbers stay printed; `par` is the time (seconds) that
-     earns a 1.0 speed multiplier. */
+     earns a 1.0 speed multiplier. The generator removes numbers in mirror pairs,
+     so the printed count lands one below the target. */
   const LEVELS = [
-    { key: 'easy', label: 'Easy', clues: 42, base: 80, par: 360,
-      desc: 'About 41 numbers printed. Plain row-and-column logic is enough.' },
-    { key: 'medium', label: 'Medium', clues: 34, base: 150, par: 720,
-      desc: 'About 33 numbers printed. You will want the pencil marks.' },
-    { key: 'hard', label: 'Hard', clues: 28, base: 190, par: 1200,
-      desc: 'About 27 numbers printed, still a single solution. Take your time.' }
+    { key: 'easy', label: 'Easy', clues: 48, base: 80, par: 360,
+      desc: 'About 47 numbers printed. Row-and-column logic alone is enough.' },
+    { key: 'medium', label: 'Medium', clues: 40, base: 150, par: 720,
+      desc: 'About 39 numbers printed. Comfortable, but pencil marks help.' },
+    { key: 'hard', label: 'Hard', clues: 34, base: 190, par: 1200,
+      desc: 'About 33 numbers printed, still a single solution. A real puzzle.' }
   ];
 
   const cfgOf = key => LEVELS.filter(l => l.key === key)[0] || LEVELS[0];
