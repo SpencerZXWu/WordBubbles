@@ -1058,6 +1058,44 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 }
 .ng-c:hover { background: var(--soft); }
 .ng-c.on:hover { background: var(--fg); }
+.ng-legend { display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--muted); }
+.ng-legend span { display: flex; align-items: center; gap: 6px; }
+.ng-swatch {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 3px; font-size: 12px; line-height: 1;
+}
+.ng-swatch.on { background: var(--fg); }
+.ng-swatch.cross { box-shadow: inset 0 0 0 1.5px var(--line-soft); color: var(--muted); }
+
+/* the worked example in the how-to-play panel, drawn with the real look */
+.ng-demo {
+  display: flex; flex-direction: column; gap: 7px;
+  margin: 4px 0 14px; padding: 13px 14px;
+  background: var(--soft); border-radius: var(--radius-sm);
+}
+.ng-demo-row { display: flex; align-items: center; gap: 10px; }
+.ng-demo-clue {
+  width: 1.3em; text-align: right; color: var(--muted);
+  font-family: var(--mono); font-weight: 700; font-size: 13px;
+}
+.ng-demo-line { display: flex; gap: 2px; }
+.ng-demo-c {
+  position: relative; display: block; width: 22px; height: 22px;
+  border-radius: 3px; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--line-soft);
+}
+.ng-demo-c.on { background: var(--fg); box-shadow: none; }
+.ng-demo-c.blank { background: var(--bg); }
+.ng-demo-c.maybe::after {
+  content: '?'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 12px; font-weight: 700;
+}
+.ng-demo-note { font-size: 11px; color: var(--muted); }
+.ng-help { max-width: 540px; max-height: calc(100vh - 40px); overflow: auto; }
+.ng-help h3 { margin-bottom: 14px; }
+.ng-help p { margin: 0 0 12px; font-size: 13px; line-height: 1.65; }
+.ng-help-list { margin: 14px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.65; }
+.ng-help-list li { margin-bottom: 8px; }
 
 /* ---------------- 2048 ---------------- */
 .g8-screen { display: flex; flex-direction: column; gap: 14px; align-items: center; }
@@ -3769,9 +3807,11 @@ const Nonogram = (() => {
   }
 
   /* Repeat the line solver over every row and column until nothing new falls
-     out. Returns the settled grid, or null when the clues do not fit. */
-  function propagate(clues, n) {
-    const grid = new Array(n * n).fill(UNKNOWN);
+     out. Pass `seed` to start from a partly-filled grid (the player's marks)
+     instead of a blank one. Returns the settled grid, or null when the clues
+     and the seed cannot both be satisfied. */
+  function propagate(clues, n, seed) {
+    const grid = seed ? seed.slice() : new Array(n * n).fill(UNKNOWN);
     let changed = true;
     let guard = 0;
     while (changed && guard++ < n * 4) {
@@ -3802,6 +3842,21 @@ const Nonogram = (() => {
       }
     }
     return grid.indexOf(UNKNOWN) < 0 ? grid : null;
+  }
+
+  /* One square the clues force that the player has not marked that way yet.
+     Because every puzzle here is solvable by line logic from empty, feeding the
+     player's own marks back into the same solver always either contradicts them
+     or settles the grid — so a hint is never a guess. */
+  function solveStep(st) {
+    const settled = propagate(st.clues, st.n, st.marks);
+    if (!settled) return { ok: false, wrong: true };
+    for (let i = 0; i < settled.length; i++) {
+      if (settled[i] === UNKNOWN) continue;
+      if (st.marks[i] === settled[i]) continue;
+      return { ok: true, cell: i, value: settled[i] };
+    }
+    return { ok: false, done: true };
   }
 
   /* ---------------- making a picture ---------------- */
@@ -3897,7 +3952,7 @@ const Nonogram = (() => {
       solution: made.solution,
       marks: new Array(cfg.n * cfg.n).fill(UNKNOWN),
       mode: 'fill',                    // 'fill' shades, 'mark' cross-hatches
-      moves: 0, status: 'playing',
+      moves: 0, hints: 0, status: 'playing',
       startedAt: Date.now(), elapsedMs: 0
     };
   }
@@ -3998,7 +4053,7 @@ const Nonogram = (() => {
       level: st.level, label: st.label, n: st.n,
       solved: solved, seconds: seconds, speed: speed,
       par: cfg.par, base: cfg.base,
-      moves: st.moves, shaded: filledCount(st),
+      moves: st.moves, hints: st.hints, shaded: filledCount(st),
       total: st.solution.filter(v => v === FILLED).length,
       points: solved ? Math.max(0, Math.min(MAX_POINTS, Math.round(cfg.base * speed))) : 0
     };
@@ -4010,7 +4065,8 @@ const Nonogram = (() => {
     start: start, paint: paint, set: set, toggleMode: toggleMode, clearAll: clearAll,
     check: check, lineStates: lineStates, filledCount: filledCount, finish: finish,
     /* exposed for tests */
-    lineSolve: lineSolve, propagate: propagate, cluesOf: cluesOf, runsOf: runsOf,
+    lineSolve: lineSolve, propagate: propagate, solveStep: solveStep,
+    cluesOf: cluesOf, runsOf: runsOf,
     makePuzzle: makePuzzle, lineIsTrivial: lineIsTrivial
   };
 })();
@@ -7684,6 +7740,64 @@ const UI = (() => {
 
   /* ---------------- nonogram ---------------- */
 
+  /* A worked example, drawn with the real square styles so it reads exactly
+     like the board the player is looking at. */
+  function ngDemoRow(clue, cells, note) {
+    return '<div class="ng-demo-row">' +
+      '<span class="ng-demo-clue">' + clue + '</span>' +
+      '<span class="ng-demo-line">' + cells.map(c =>
+        '<i class="ng-demo-c ' + c + '"></i>').join('') + '</span>' +
+      (note ? '<span class="ng-demo-note">' + note + '</span>' : '') +
+      '</div>';
+  }
+
+  /* "How to play" — the numbers are the whole game, so this spells out the one
+     idea that unlocks it and the two habits that follow from it. */
+  function nonogramHelp() {
+    const root = document.getElementById('modalRoot');
+    if (!root) return;
+    const start = ['on', 'on', 'on', 'on', 'blank'];
+    const shift = ['blank', 'on', 'on', 'on', 'on'];
+    const both = ['maybe', 'on', 'on', 'on', 'maybe'];
+    root.hidden = false;
+    root.innerHTML =
+      '<div class="modal ng-help">' +
+        '<h3>How to play Nonogram</h3>' +
+        '<p>Each number beside a row or above a column is the length of one ' +
+          'run of shaded squares in that line, <b>in order</b>. A clue of ' +
+          '<b>3 1</b> means three shaded together, then at least one blank, ' +
+          'then one shaded — and that is the whole line.</p>' +
+        '<p>You never have to guess. The trick is that a run has to fit ' +
+          'somewhere, and two places often share squares:</p>' +
+        '<div class="ng-demo">' +
+          ngDemoRow('4', start, 'run could start here') +
+          ngDemoRow('4', shift, 'or here') +
+          ngDemoRow('', both, 'so these three must be shaded') +
+        '</div>' +
+        '<p>That is the whole idea — a run of <b>4</b> in a line of <b>5</b> ' +
+          'can only start in one of two places, and the squares they share are ' +
+          'certain. Bigger runs and longer lines make the certain part bigger.</p>' +
+        '<ul class="ng-help-list">' +
+          '<li><b>Shade</b> squares you have worked out: drag across them, or ' +
+            'tap one at a time. Tap again to rub it out.</li>' +
+          '<li><b>Cross</b> squares you have worked out must stay blank — press ' +
+            '<b>Shade: off</b> or the <b>X</b> key to switch tools. These are ' +
+            'just as valuable as shading: a blank tells you where a run cannot go.</li>' +
+          '<li>A finished line <b>dims its numbers</b>. If you shade <b>too ' +
+            'many</b> squares in a line, its numbers turn <b>red</b> — that is ' +
+            'your signal to undo something in that line.</li>' +
+          '<li>Stuck? Press <b>Hint</b> and the app will work out one square ' +
+            'that the clues already decide, and mark it for you.</li>' +
+          '<li>Every puzzle here has exactly one answer and can be finished by ' +
+            'this kind of reasoning alone — no guessing, ever.</li>' +
+        '</ul>' +
+        '<div class="modal-actions"><button class="btn primary" id="ngHelpClose">Got it</button></div>' +
+      '</div>';
+    const close = () => { root.hidden = true; root.innerHTML = ''; };
+    root.querySelector('#ngHelpClose').addEventListener('click', close);
+    root.addEventListener('click', e => { if (e.target === root) close(); });
+  }
+
   function nonogramDifficulty(selected) {
     puzzleDiff('Nonogram',
       'The numbers beside each row and above each column are the lengths of that ' +
@@ -7733,15 +7847,22 @@ const UI = (() => {
           '<div class="ng-left">' + left + '</div>' +
           '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
         '</div>' +
+        '<div class="ng-legend">' +
+          '<span><i class="ng-swatch on"></i> shade</span>' +
+          '<span><i class="ng-swatch cross">×</i> must stay blank</span>' +
+        '</div>' +
         '<div class="mine-foot">' +
           '<span class="mine-level">' + n + ' × ' + n +
             ' · par ' + fmtTime(st.par) + '</span>' +
           '<button class="btn ghost" id="ngMode">Shade: on</button>' +
+          '<button class="btn ghost" id="ngHint">Hint</button>' +
           '<button class="btn ghost" id="ngClear">Clear marks</button>' +
+          '<button class="btn ghost" id="ngHelp">How to play</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="ngStatus">Drag across squares to shade them. ' +
-          'Switch to the cross tool to note squares that must stay blank.</div>' +
+        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, ' +
+          'or tap one at a time. The numbers are the lengths of each run of shaded ' +
+          'squares — press How to play for a worked example.</div>' +
       '</div>';
   }
 
@@ -8388,7 +8509,7 @@ const UI = (() => {
     mineDifficulty, mineGame, mineSync, mineResult,
     slideDifficulty, slideGame, slideSync, slideResult,
     sudokuDifficulty, sudokuGame, sudokuSync, sudokuResult,
-    nonogramDifficulty, nonogramGame, nonogramSync, nonogramResult,
+    nonogramDifficulty, nonogramGame, nonogramSync, nonogramResult, nonogramHelp,
     g2048Difficulty, g2048Game, g2048Sync, g2048Result,
     typingDifficulty, typingGame, typingSync, typingResult,
     codebreakDifficulty, codebreakGame, codebreakSync, codebreakResult,
@@ -10885,6 +11006,10 @@ const App = (() => {
       Nonogram.toggleMode(ngState);
       UI.nonogramSync(ngState);
     });
+    const hint = document.getElementById('ngHint');
+    if (hint) hint.addEventListener('click', ngHint);
+    const help = document.getElementById('ngHelp');
+    if (help) help.addEventListener('click', () => UI.nonogramHelp());
     const clear = document.getElementById('ngClear');
     if (clear) clear.addEventListener('click', () => {
       if (!ngState) return;
@@ -10893,6 +11018,38 @@ const App = (() => {
     });
     const again = document.getElementById('ngNew');
     if (again) again.addEventListener('click', () => startNonogram(ngState ? ngState.level : ngLevel));
+  }
+
+  /* Hand the player one square the clues already decide. The solver runs on top
+     of their own marks, so it never contradicts a correct board and it catches
+     a wrong mark instead of papering over it. */
+  function ngHint() {
+    const st = ngState;
+    if (!st || st.status !== 'playing') return;
+    const say = document.getElementById('ngStatus');
+    const step = Nonogram.solveStep(st);
+    if (!step.ok) {
+      if (say) {
+        say.textContent = step.wrong
+          ? 'One of your marks cannot be right — look for numbers that turned red'
+          : 'Nothing left to work out — the picture is already correct';
+      }
+      return;
+    }
+    st.hints++;
+    Nonogram.set(st, step.cell, step.value);
+    UI.nonogramSync(st);
+    const cell = document.querySelector('#ngGrid .ng-c[data-i="' + step.cell + '"]');
+    if (cell && cell.animate && !reduceMotion) {
+      cell.animate([{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }],
+        { duration: 340, easing: 'ease-out' });
+    }
+    if (say) {
+      const row = ((step.cell / st.n) | 0) + 1, col = (step.cell % st.n) + 1;
+      say.textContent = 'Row ' + row + ', column ' + col + ' has to be ' +
+        (step.value === Nonogram.FILLED ? 'shaded' : 'left blank');
+    }
+    if (st.status === 'solved') leaveNonogramScreen();
   }
 
   function leaveNonogramScreen() {

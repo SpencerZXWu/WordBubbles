@@ -1767,6 +1767,64 @@ const UI = (() => {
 
   /* ---------------- nonogram ---------------- */
 
+  /* A worked example, drawn with the real square styles so it reads exactly
+     like the board the player is looking at. */
+  function ngDemoRow(clue, cells, note) {
+    return '<div class="ng-demo-row">' +
+      '<span class="ng-demo-clue">' + clue + '</span>' +
+      '<span class="ng-demo-line">' + cells.map(c =>
+        '<i class="ng-demo-c ' + c + '"></i>').join('') + '</span>' +
+      (note ? '<span class="ng-demo-note">' + note + '</span>' : '') +
+      '</div>';
+  }
+
+  /* "How to play" — the numbers are the whole game, so this spells out the one
+     idea that unlocks it and the two habits that follow from it. */
+  function nonogramHelp() {
+    const root = document.getElementById('modalRoot');
+    if (!root) return;
+    const start = ['on', 'on', 'on', 'on', 'blank'];
+    const shift = ['blank', 'on', 'on', 'on', 'on'];
+    const both = ['maybe', 'on', 'on', 'on', 'maybe'];
+    root.hidden = false;
+    root.innerHTML =
+      '<div class="modal ng-help">' +
+        '<h3>How to play Nonogram</h3>' +
+        '<p>Each number beside a row or above a column is the length of one ' +
+          'run of shaded squares in that line, <b>in order</b>. A clue of ' +
+          '<b>3 1</b> means three shaded together, then at least one blank, ' +
+          'then one shaded — and that is the whole line.</p>' +
+        '<p>You never have to guess. The trick is that a run has to fit ' +
+          'somewhere, and two places often share squares:</p>' +
+        '<div class="ng-demo">' +
+          ngDemoRow('4', start, 'run could start here') +
+          ngDemoRow('4', shift, 'or here') +
+          ngDemoRow('', both, 'so these three must be shaded') +
+        '</div>' +
+        '<p>That is the whole idea — a run of <b>4</b> in a line of <b>5</b> ' +
+          'can only start in one of two places, and the squares they share are ' +
+          'certain. Bigger runs and longer lines make the certain part bigger.</p>' +
+        '<ul class="ng-help-list">' +
+          '<li><b>Shade</b> squares you have worked out: drag across them, or ' +
+            'tap one at a time. Tap again to rub it out.</li>' +
+          '<li><b>Cross</b> squares you have worked out must stay blank — press ' +
+            '<b>Shade: off</b> or the <b>X</b> key to switch tools. These are ' +
+            'just as valuable as shading: a blank tells you where a run cannot go.</li>' +
+          '<li>A finished line <b>dims its numbers</b>. If you shade <b>too ' +
+            'many</b> squares in a line, its numbers turn <b>red</b> — that is ' +
+            'your signal to undo something in that line.</li>' +
+          '<li>Stuck? Press <b>Hint</b> and the app will work out one square ' +
+            'that the clues already decide, and mark it for you.</li>' +
+          '<li>Every puzzle here has exactly one answer and can be finished by ' +
+            'this kind of reasoning alone — no guessing, ever.</li>' +
+        '</ul>' +
+        '<div class="modal-actions"><button class="btn primary" id="ngHelpClose">Got it</button></div>' +
+      '</div>';
+    const close = () => { root.hidden = true; root.innerHTML = ''; };
+    root.querySelector('#ngHelpClose').addEventListener('click', close);
+    root.addEventListener('click', e => { if (e.target === root) close(); });
+  }
+
   function nonogramDifficulty(selected) {
     puzzleDiff('Nonogram',
       'The numbers beside each row and above each column are the lengths of that ' +
@@ -1816,15 +1874,22 @@ const UI = (() => {
           '<div class="ng-left">' + left + '</div>' +
           '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
         '</div>' +
+        '<div class="ng-legend">' +
+          '<span><i class="ng-swatch on"></i> shade</span>' +
+          '<span><i class="ng-swatch cross">×</i> must stay blank</span>' +
+        '</div>' +
         '<div class="mine-foot">' +
           '<span class="mine-level">' + n + ' × ' + n +
             ' · par ' + fmtTime(st.par) + '</span>' +
           '<button class="btn ghost" id="ngMode">Shade: on</button>' +
+          '<button class="btn ghost" id="ngHint">Hint</button>' +
           '<button class="btn ghost" id="ngClear">Clear marks</button>' +
+          '<button class="btn ghost" id="ngHelp">How to play</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="ngStatus">Drag across squares to shade them. ' +
-          'Switch to the cross tool to note squares that must stay blank.</div>' +
+        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, ' +
+          'or tap one at a time. The numbers are the lengths of each run of shaded ' +
+          'squares — press How to play for a worked example.</div>' +
       '</div>';
   }
 
@@ -2471,7 +2536,7 @@ const UI = (() => {
     mineDifficulty, mineGame, mineSync, mineResult,
     slideDifficulty, slideGame, slideSync, slideResult,
     sudokuDifficulty, sudokuGame, sudokuSync, sudokuResult,
-    nonogramDifficulty, nonogramGame, nonogramSync, nonogramResult,
+    nonogramDifficulty, nonogramGame, nonogramSync, nonogramResult, nonogramHelp,
     g2048Difficulty, g2048Game, g2048Sync, g2048Result,
     typingDifficulty, typingGame, typingSync, typingResult,
     codebreakDifficulty, codebreakGame, codebreakSync, codebreakResult,

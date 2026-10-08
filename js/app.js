@@ -2484,6 +2484,10 @@ const App = (() => {
       Nonogram.toggleMode(ngState);
       UI.nonogramSync(ngState);
     });
+    const hint = document.getElementById('ngHint');
+    if (hint) hint.addEventListener('click', ngHint);
+    const help = document.getElementById('ngHelp');
+    if (help) help.addEventListener('click', () => UI.nonogramHelp());
     const clear = document.getElementById('ngClear');
     if (clear) clear.addEventListener('click', () => {
       if (!ngState) return;
@@ -2492,6 +2496,38 @@ const App = (() => {
     });
     const again = document.getElementById('ngNew');
     if (again) again.addEventListener('click', () => startNonogram(ngState ? ngState.level : ngLevel));
+  }
+
+  /* Hand the player one square the clues already decide. The solver runs on top
+     of their own marks, so it never contradicts a correct board and it catches
+     a wrong mark instead of papering over it. */
+  function ngHint() {
+    const st = ngState;
+    if (!st || st.status !== 'playing') return;
+    const say = document.getElementById('ngStatus');
+    const step = Nonogram.solveStep(st);
+    if (!step.ok) {
+      if (say) {
+        say.textContent = step.wrong
+          ? 'One of your marks cannot be right — look for numbers that turned red'
+          : 'Nothing left to work out — the picture is already correct';
+      }
+      return;
+    }
+    st.hints++;
+    Nonogram.set(st, step.cell, step.value);
+    UI.nonogramSync(st);
+    const cell = document.querySelector('#ngGrid .ng-c[data-i="' + step.cell + '"]');
+    if (cell && cell.animate && !reduceMotion) {
+      cell.animate([{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }],
+        { duration: 340, easing: 'ease-out' });
+    }
+    if (say) {
+      const row = ((step.cell / st.n) | 0) + 1, col = (step.cell % st.n) + 1;
+      say.textContent = 'Row ' + row + ', column ' + col + ' has to be ' +
+        (step.value === Nonogram.FILLED ? 'shaded' : 'left blank');
+    }
+    if (st.status === 'solved') leaveNonogramScreen();
   }
 
   function leaveNonogramScreen() {

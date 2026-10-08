@@ -97,9 +97,11 @@ const Nonogram = (() => {
   }
 
   /* Repeat the line solver over every row and column until nothing new falls
-     out. Returns the settled grid, or null when the clues do not fit. */
-  function propagate(clues, n) {
-    const grid = new Array(n * n).fill(UNKNOWN);
+     out. Pass `seed` to start from a partly-filled grid (the player's marks)
+     instead of a blank one. Returns the settled grid, or null when the clues
+     and the seed cannot both be satisfied. */
+  function propagate(clues, n, seed) {
+    const grid = seed ? seed.slice() : new Array(n * n).fill(UNKNOWN);
     let changed = true;
     let guard = 0;
     while (changed && guard++ < n * 4) {
@@ -130,6 +132,21 @@ const Nonogram = (() => {
       }
     }
     return grid.indexOf(UNKNOWN) < 0 ? grid : null;
+  }
+
+  /* One square the clues force that the player has not marked that way yet.
+     Because every puzzle here is solvable by line logic from empty, feeding the
+     player's own marks back into the same solver always either contradicts them
+     or settles the grid — so a hint is never a guess. */
+  function solveStep(st) {
+    const settled = propagate(st.clues, st.n, st.marks);
+    if (!settled) return { ok: false, wrong: true };
+    for (let i = 0; i < settled.length; i++) {
+      if (settled[i] === UNKNOWN) continue;
+      if (st.marks[i] === settled[i]) continue;
+      return { ok: true, cell: i, value: settled[i] };
+    }
+    return { ok: false, done: true };
   }
 
   /* ---------------- making a picture ---------------- */
@@ -225,7 +242,7 @@ const Nonogram = (() => {
       solution: made.solution,
       marks: new Array(cfg.n * cfg.n).fill(UNKNOWN),
       mode: 'fill',                    // 'fill' shades, 'mark' cross-hatches
-      moves: 0, status: 'playing',
+      moves: 0, hints: 0, status: 'playing',
       startedAt: Date.now(), elapsedMs: 0
     };
   }
@@ -326,7 +343,7 @@ const Nonogram = (() => {
       level: st.level, label: st.label, n: st.n,
       solved: solved, seconds: seconds, speed: speed,
       par: cfg.par, base: cfg.base,
-      moves: st.moves, shaded: filledCount(st),
+      moves: st.moves, hints: st.hints, shaded: filledCount(st),
       total: st.solution.filter(v => v === FILLED).length,
       points: solved ? Math.max(0, Math.min(MAX_POINTS, Math.round(cfg.base * speed))) : 0
     };
@@ -338,7 +355,8 @@ const Nonogram = (() => {
     start: start, paint: paint, set: set, toggleMode: toggleMode, clearAll: clearAll,
     check: check, lineStates: lineStates, filledCount: filledCount, finish: finish,
     /* exposed for tests */
-    lineSolve: lineSolve, propagate: propagate, cluesOf: cluesOf, runsOf: runsOf,
+    lineSolve: lineSolve, propagate: propagate, solveStep: solveStep,
+    cluesOf: cluesOf, runsOf: runsOf,
     makePuzzle: makePuzzle, lineIsTrivial: lineIsTrivial
   };
 })();
