@@ -939,13 +939,13 @@ const UI = (() => {
     let cells = '';
     for (let i = 0; i < st.size; i++) cells += '<button class="mc" data-i="' + i + '"></button>';
     app().innerHTML =
-      '<div class="screen mine-screen">' +
+      '<div class="screen wide game-screen mine-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="mineLeft">' + st.mines + '</b><span>mines left</span></div>' +
           '<button class="mine-face" id="mineFace" title="New board" aria-label="New board">☺</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="mine-wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="minegrid" id="minegrid" style="--cols:' + st.cols + ';--rows:' + st.rows + '">' +
             cells +
           '</div>' +
@@ -1536,13 +1536,13 @@ const UI = (() => {
   function slideGame(st) {
     const tiles = st.size - 1;
     app().innerHTML =
-      '<div class="screen slide-screen">' +
+      '<div class="screen wide game-screen slide-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="moveCount">0</b><span>moves</span></div>' +
           '<button class="mine-face" id="slideNew" title="Scramble again" aria-label="Scramble again">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="slide-wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="slide-grid" id="slideGrid" style="--n:' + st.n + '"></div>' +
         '</div>' +
         '<div class="mine-foot">' +
@@ -1659,14 +1659,16 @@ const UI = (() => {
     pad += '<button class="su-key erase" data-v="0" title="Erase (Backspace)">⌫</button>';
 
     app().innerHTML =
-      '<div class="screen su-screen">' +
+      '<div class="screen wide game-screen su-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="suLeft">' + (st.size - st.clues) + '</b><span>to fill</span></div>' +
           '<button class="mine-face" id="suNew" title="New puzzle" aria-label="New puzzle">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="su-wrap">' +
-          '<div class="su-grid" id="suGrid">' + cells.join('') + '</div>' +
+        '<div class="su-body">' +
+          '<div class="game-stage" id="stage">' +
+            '<div class="su-grid" id="suGrid">' + cells.join('') + '</div>' +
+          '</div>' +
           '<div class="su-side">' +
             '<div class="su-pad" id="suPad">' + pad + '</div>' +
             '<button class="btn ghost su-notes" id="suNotes">Pencil marks: off</button>' +
@@ -1862,23 +1864,25 @@ const UI = (() => {
     }
 
     app().innerHTML =
-      '<div class="screen ng-screen">' +
+      '<div class="screen wide game-screen ng-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="ngShaded">0</b><span>shaded</span></div>' +
           '<button class="mine-face" id="ngNew" title="New picture" aria-label="New picture">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="ng-wrap" id="ngWrap" style="--n:' + n + ';--c:' + c + 'px">' +
-          '<div class="ng-corner"></div>' +
-          '<div class="ng-top">' + top + '</div>' +
-          '<div class="ng-left">' + left + '</div>' +
-          '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
-        '</div>' +
-        '<div class="ng-legend">' +
-          '<span><i class="ng-swatch on"></i> shade</span>' +
-          '<span><i class="ng-swatch cross">×</i> must stay blank</span>' +
+        '<div class="game-stage" id="stage">' +
+          '<div class="ng-wrap" id="ngWrap" style="--n:' + n + ';--c:' + c + 'px">' +
+            '<div class="ng-corner"></div>' +
+            '<div class="ng-top">' + top + '</div>' +
+            '<div class="ng-left">' + left + '</div>' +
+            '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="mine-foot">' +
+          '<span class="ng-legend">' +
+            '<span><i class="ng-swatch on"></i> shade</span>' +
+            '<span><i class="ng-swatch cross">×</i> blank</span>' +
+          '</span>' +
           '<span class="mine-level">' + n + ' × ' + n +
             ' · par ' + fmtTime(st.par) + '</span>' +
           '<button class="btn ghost" id="ngMode">Shade: on</button>' +
@@ -1887,9 +1891,7 @@ const UI = (() => {
           '<button class="btn ghost" id="ngHelp">How to play</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, ' +
-          'or tap one at a time. The numbers are the lengths of each run of shaded ' +
-          'squares — press How to play for a worked example.</div>' +
+        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, or tap one at a time.</div>' +
       '</div>';
   }
 
@@ -1977,32 +1979,46 @@ const UI = (() => {
     let cells = '';
     for (let i = 0; i < st.board.length; i++) cells += '<div class="g8-c" data-i="' + i + '"></div>';
     app().innerHTML =
-      '<div class="screen g8-screen">' +
+      '<div class="screen wide game-screen g8-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="g8Score">0</b><span>score</span></div>' +
           '<button class="mine-face" id="g8New" title="New grid" aria-label="New grid">↻</button>' +
           '<div class="mine-stat"><b id="g8Best">0</b><span>biggest · goal ' + st.goal + '</span></div>' +
         '</div>' +
-        '<div class="g8-wrap" id="g8Wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="g8-grid" id="g8Grid" style="--n:' + st.n + '">' + cells + '</div>' +
         '</div>' +
-        '<div class="mine-foot">' +
+        '<div class="g8-foot">' +
+          '<div class="g8-dpad">' +
+            '<button class="g8-dir up" data-dir="up" title="Up (arrow key / W)" aria-label="Up"></button>' +
+            '<button class="g8-dir left" data-dir="left" title="Left (arrow key / A)" aria-label="Left"></button>' +
+            '<span class="g8-hintpad">swipe</span>' +
+            '<button class="g8-dir right" data-dir="right" title="Right (arrow key / D)" aria-label="Right"></button>' +
+            '<button class="g8-dir down" data-dir="down" title="Down (arrow key / S)" aria-label="Down"></button>' +
+          '</div>' +
           '<span class="mine-level">' + esc(st.label) + ' · goal ' + st.goal +
             ' · ' + st.moves + ' moves</span>' +
-          '<button class="btn ghost" id="g8Up">↑</button>' +
-          '<button class="btn ghost" id="g8Down">↓</button>' +
-          '<button class="btn ghost" id="g8Left">←</button>' +
-          '<button class="btn ghost" id="g8Right">→</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="g8Status">Swipe the grid, or use the arrow keys ' +
-          'or the buttons below.</div>' +
+        '<div class="chess-status" id="g8Status">Swipe the grid, use the arrow keys, ' +
+          'or tap the cross below.</div>' +
       '</div>';
+  }
+
+  /* A stand-in for app.js's reduceMotion flag, which is private to that module:
+     the global kill-switch in app.js still handles the CSS side. */
+  function motionOff() {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+      return false;
+    }
   }
 
   function g2048Sync(st, res) {
     const grid = document.getElementById('g8Grid');
     if (!grid) return;
+    const n = st.n;
     for (let i = 0; i < st.board.length; i++) {
       const el = grid.children[i];
       if (!el) continue;
@@ -2014,14 +2030,33 @@ const UI = (() => {
       if (el.textContent !== txt) el.textContent = txt;
       if (el.className !== cls) el.className = cls;
     }
+    /* Tiles that travelled start where they came from and ease into place. The
+       offset uses the independent `translate` property, so it composes with the
+       `scale` used by the pop animation instead of fighting it. */
+    const slides = (res && res.slides) || [];
+    const moving = slides.filter(s => s.from !== s.to);
+    if (moving.length && !motionOff()) {
+      moving.forEach(s => {
+        const el = grid.children[s.to];
+        if (!el) return;
+        const dx = (s.from % n) - (s.to % n);
+        const dy = ((s.from / n) | 0) - ((s.to / n) | 0);
+        el.style.transition = 'none';
+        el.style.translate = 'calc(' + dx + ' * (100% + var(--g8-gap))) ' +
+          'calc(' + dy + ' * (100% + var(--g8-gap)))';
+      });
+      void grid.offsetWidth;                    // bank the offset as the start
+      moving.forEach(s => {
+        const el = grid.children[s.to];
+        if (el) { el.style.transition = ''; el.style.translate = ''; }
+      });
+    }
     const sc = document.getElementById('g8Score');
     if (sc) sc.textContent = String(st.score);
     const bs = document.getElementById('g8Best');
     if (bs) bs.textContent = String(G2048.bestTile(st));
     const mv = document.querySelector('.g8-screen .mine-level');
-    if (mv) {
-      mv.textContent = st.label + ' · goal ' + st.goal + ' · ' + st.moves + ' moves';
-    }
+    if (mv) mv.textContent = st.label + ' · goal ' + st.goal + ' · ' + st.moves + ' moves';
   }
 
   function g2048Result(st, res) {
@@ -2083,7 +2118,7 @@ const UI = (() => {
 
   function typingGame(st) {
     app().innerHTML =
-      '<div class="screen ty-screen">' +
+      '<div class="screen wide game-screen ty-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="tyWpm">0</b><span>words / min</span></div>' +
           '<button class="mine-face" id="tyNew" title="Another passage" aria-label="Another passage">↻</button>' +
@@ -2116,14 +2151,17 @@ const UI = (() => {
     if (w) w.textContent = String(Math.round(live.wpm));
     const a = document.getElementById('tyAcc');
     if (a) a.textContent = Math.round(live.accuracy * 100) + '%';
-    /* keep the caret in view on a long passage */
+    /* keep the current character in view on a long passage */
     const wrap = document.getElementById('tyWrap');
     const next = text && text.querySelector('.ty-ch.next');
     if (wrap && next) {
-      const r = next.getBoundingClientRect();
-      const wr = wrap.getBoundingClientRect();
-      if (r.top < wr.top + 8 || r.bottom > wr.bottom - 8) {
-        wrap.scrollTop += r.top - wr.top - wrap.clientHeight / 2;
+      const top = next.offsetTop;
+      const line = next.offsetHeight || 26;
+      const seen = wrap.scrollTop;
+      const pad = 10;
+      if (top - pad < seen) wrap.scrollTop = Math.max(0, top - line * 1.5);
+      else if (top + line + pad > seen + wrap.clientHeight) {
+        wrap.scrollTop = top - wrap.clientHeight + line * 2.5;
       }
     }
   }
@@ -2197,7 +2235,7 @@ const UI = (() => {
     pad += '<button class="cb-key go" data-cmd="go" title="Submit (Enter)">Guess</button>';
 
     app().innerHTML =
-      '<div class="screen cb-screen">' +
+      '<div class="screen wide game-screen cb-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="cbLeft">' + st.maxTries + '</b><span>guesses left</span></div>' +
           '<button class="mine-face" id="cbNew" title="New code" aria-label="New code">↻</button>' +
@@ -2307,7 +2345,7 @@ const UI = (() => {
 
   function ladderGame(st) {
     app().innerHTML =
-      '<div class="screen la-screen">' +
+      '<div class="screen wide game-screen la-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="laSteps">0</b><span>steps</span></div>' +
           '<button class="mine-face" id="laNew" title="New ladder" aria-label="New ladder">↻</button>' +

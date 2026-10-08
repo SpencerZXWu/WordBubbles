@@ -70,12 +70,12 @@ const Ladder = (() => {
   BANKS[4] = Array.from(new Set(BANKS[4]));
 
   const LEVELS = [
-    { key: 'easy', label: '3 letters', n: 3, minPath: 4, maxPath: 6, base: 80, par: 150,
-      desc: 'Short words like cat and dog. Four to six steps apart.' },
-    { key: 'medium', label: '4 letters', n: 4, minPath: 4, maxPath: 6, base: 130, par: 300,
-      desc: 'Four-letter words four to six steps apart.' },
-    { key: 'hard', label: '4 letters, longer', n: 4, minPath: 6, maxPath: 8, base: 170, par: 420,
-      desc: 'Four-letter words six to eight steps apart. Think ahead.' }
+    { key: 'easy', label: '3 letters', n: 3, minPath: 3, maxPath: 4, base: 80, par: 120,
+      desc: 'Short words like cat and dog. Only three or four steps apart.' },
+    { key: 'medium', label: '4 letters', n: 4, minPath: 4, maxPath: 5, base: 130, par: 260,
+      desc: 'Four-letter words four or five steps apart.' },
+    { key: 'hard', label: '4 letters, longer', n: 4, minPath: 5, maxPath: 6, base: 170, par: 380,
+      desc: 'Four-letter words five or six steps apart. Think a little ahead.' }
   ];
 
   const cfgOf = key => LEVELS.filter(l => l.key === key)[0] || LEVELS[0];

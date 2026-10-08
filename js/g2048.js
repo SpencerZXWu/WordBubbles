@@ -69,32 +69,40 @@ const G2048 = (() => {
     return out;
   }
 
-  /* Slide and merge one line. Returns the board positions that just merged. */
+  /* Slide and merge one line. `from` gives, per landing square, the square the
+     tile came from (-1 for an empty landing square) so the view can animate it. */
   function collapse(st, cells) {
     const n = st.n;
-    const packed = [];
-    cells.forEach(i => { if (st.board[i]) packed.push(st.board[i]); });
+    const src = [];
+    cells.forEach(i => { if (st.board[i]) src.push(i); });
     const out = [];
+    const from = [];
     const mergedAt = [];
-    for (let k = 0; k < packed.length; k++) {
-      if (k < packed.length - 1 && packed[k] === packed[k + 1]) {
-        const v = packed[k] * 2;
+    for (let k = 0; k < src.length; k++) {
+      if (k < src.length - 1 && st.board[src[k]] === st.board[src[k + 1]]) {
+        const v = st.board[src[k]] * 2;
         out.push(v);
+        from.push(src[k]);            // anchor the slide on the first of the pair
         mergedAt.push(out.length - 1);
         st.score += v;
         st.merges++;
         k++;
       } else {
-        out.push(packed[k]);
+        out.push(st.board[src[k]]);
+        from.push(src[k]);
       }
     }
-    while (out.length < n) out.push(0);
+    while (out.length < n) { out.push(0); from.push(-1); }
     let changed = false;
     for (let k = 0; k < n; k++) {
       if (st.board[cells[k]] !== out[k]) changed = true;
       st.board[cells[k]] = out[k];
     }
-    return { changed: changed, mergedAt: mergedAt.map(k => cells[k]) };
+    return {
+      changed: changed,
+      mergedAt: mergedAt.map(k => cells[k]),
+      moved: from.map((f, k) => ({ from: f, to: cells[k] })).filter(m => m.from >= 0)
+    };
   }
 
   /* One swipe. `dir` is one of up / down / left / right. */
@@ -102,11 +110,18 @@ const G2048 = (() => {
     if (st.status !== 'playing') return { moved: false };
     if (!DIRS[dir]) return { moved: false };
     const merged = [];
+    const slides = [];
     let changed = false;
     lines(st, dir).forEach(line => {
+      const before = line.map(i => st.board[i]);
       const r = collapse(st, line);
       if (r.changed) changed = true;
       r.mergedAt.forEach(i => merged.push(i));
+      /* only tiles that actually travelled are worth animating */
+      r.moved.forEach(m => {
+        if (m.from !== m.to) slides.push(m);
+      });
+      void before;
     });
     if (!changed) return { moved: false };
 
@@ -116,7 +131,7 @@ const G2048 = (() => {
     if (bestTile(st) >= st.goal) st.status = 'won';
     else if (!hasMoves(st)) st.status = 'lost';
     return {
-      moved: true, merged: merged, spawned: spawned,
+      moved: true, merged: merged, slides: slides, spawned: spawned,
       status: st.status, score: st.score, best: bestTile(st)
     };
   }

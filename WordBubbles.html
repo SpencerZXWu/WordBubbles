@@ -103,7 +103,7 @@ a { color: inherit; }
   border-bottom: 1px solid var(--line-soft);
 }
 .topbar-inner {
-  max-width: 880px; margin: 0 auto; padding: 14px 20px;
+  max-width: 1180px; margin: 0 auto; padding: 14px 22px;
   display: flex; align-items: center; justify-content: space-between;
 }
 .logo {
@@ -149,13 +149,38 @@ a { color: inherit; }
 [data-theme="dark"] .theme-icon::after { background: var(--bg); transform: translate(-50%, -50%) scale(1.2); }
 
 /* ---------------- layout ---------------- */
-.app { flex: 1; width: 100%; max-width: 880px; margin: 0 auto; padding: 32px 20px 72px; }
+.app { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 22px 22px 30px; }
 .footer {
-  text-align: center; padding: 24px; color: var(--muted);
+  text-align: center; padding: 12px; color: var(--muted);
   font-size: 12px; letter-spacing: .02em; border-top: 1px solid var(--line-soft);
 }
 
 .screen { animation: rise .35s var(--ease) both; }
+/* reading- and form-first screens stay narrower than a board; game screens ask for `.wide` */
+.screen:not(.wide) { max-width: 860px; margin-left: auto; margin-right: auto; }
+
+/* A game screen claims the height left over under the top bar, and hands
+   everything that is not a header or footer to its stage. Boards size
+   themselves from that stage (see the per-game --size rules below) so they fill
+   the room instead of floating in it. */
+.game-screen {
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: calc(100vh - var(--topbar-h) - 84px);
+  min-height: calc(100dvh - var(--topbar-h) - 84px);
+  /* never taller than the viewport, or a big board pushes the chrome off screen */
+  max-height: calc(100vh - var(--topbar-h) - 92px);
+  max-height: calc(100dvh - var(--topbar-h) - 92px);
+}
+.game-stage {
+  flex: 1 1 auto; min-height: 52vh; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+/* the header, footer and status lines are furniture — keep them out of the way */
+.game-screen .mine-head { padding: 4px 0; }
+.game-screen .mine-stat b { font-size: 20px; }
+.game-screen .mine-stat span { font-size: 9px; }
+.game-screen .mine-foot { gap: 8px; }
+.game-screen .chess-status { font-size: 12px; line-height: 1.45; }
 .page-title { font-size: clamp(28px, 6vw, 40px); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; }
 .page-sub { color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
 .section-label {
@@ -935,9 +960,8 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 /* the frame never changes size; tiles are absolutely placed inside it and moved
    with a transform, so a slide is one transition instead of a re-layout */
 .slide-grid {
-  position: relative;
-  width: min(92vw, 58vh, 480px);
-  aspect-ratio: 1 / 1;
+  position: relative; flex: 0 0 auto;
+  width: var(--size, 360px); height: var(--size, 360px);
   border: 1.5px solid var(--line-soft); border-radius: 14px;
   background: var(--soft); overflow: hidden;
 }
@@ -965,13 +989,15 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 /* ---------------- sudoku ---------------- */
 .su-screen { display: flex; flex-direction: column; gap: 16px; align-items: center; }
 .su-screen .chess-status { width: 100%; }
-.su-wrap {
-  display: flex; align-items: flex-start; justify-content: center;
-  gap: 18px; flex-wrap: wrap; width: 100%;
+.su-body {
+  display: flex; align-items: stretch; justify-content: center;
+  gap: 18px; flex: 1 1 auto; min-height: 0; width: 100%;
 }
 .su-grid {
-  display: grid; grid-template-columns: repeat(9, 1fr);
-  width: min(92vw, 54vh, 460px); aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
+  width: var(--size, 340px); height: var(--size, 340px); flex: 0 0 auto;
   border: 2px solid var(--fg); border-radius: 8px; overflow: hidden;
   background: var(--bg);
 }
@@ -987,6 +1013,8 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 .su-c.br { box-shadow: inset -2px -1px 0 var(--fg); }
 .su-c.bb { box-shadow: inset -1px -2px 0 var(--fg); }
 .su-c.br.bb { box-shadow: inset -2px -2px 0 var(--fg); }
+.su-c.entry { animation: cellIn .18s var(--ease) both; }
+@keyframes cellIn { from { scale: .78; opacity: .35; } to { scale: 1; opacity: 1; } }
 .su-c.given { font-weight: 800; }
 /* numbers the player typed read lighter, the way a pencil entry does on paper */
 .su-c.entry { color: var(--muted); font-weight: 700; }
@@ -1004,7 +1032,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   color: var(--muted); font-size: clamp(6px, 1.5vw, 9px); font-weight: 600;
 }
 .su-notes-grid i { display: flex; align-items: center; justify-content: center; font-style: normal; }
-.su-side { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 250px); }
+.su-side { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 250px); flex: 0 0 auto; }
 .su-pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .su-key {
   padding: 12px 0; border-radius: 10px; cursor: pointer;
@@ -1022,8 +1050,9 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 .ng-screen { display: flex; flex-direction: column; gap: 14px; align-items: center; }
 .ng-screen .chess-status { width: 100%; }
 .ng-wrap { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; }
-.ng-top { display: grid; grid-template-columns: repeat(var(--n), var(--c)); align-items: end; }
-.ng-left { display: grid; grid-template-rows: repeat(var(--n), var(--c)); justify-items: end; }
+/* the clue strips sit clear of the board instead of touching it */
+.ng-top { display: grid; grid-template-columns: repeat(var(--n), var(--c)); align-items: end; padding-bottom: 15px; }
+.ng-left { display: grid; grid-template-rows: repeat(var(--n), var(--c)); justify-items: end; padding-right: 17px; }
 .ng-grid {
   display: grid;
   grid-template-columns: repeat(var(--n), var(--c));
@@ -1035,6 +1064,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   color: var(--muted); font-family: var(--mono); font-weight: 700;
   font-size: clamp(9px, 2.1vw, 15px); line-height: 1.05;
 }
+.ng-clue b { transition: opacity .3s var(--ease), color .3s var(--ease); }
 .ng-clue-top { flex-direction: column; justify-content: flex-end; height: calc(var(--c) * 2.4); }
 .ng-clue-top b { display: block; }
 .ng-clue-left { width: calc(var(--c) * 2.4); }
@@ -1058,7 +1088,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 }
 .ng-c:hover { background: var(--soft); }
 .ng-c.on:hover { background: var(--fg); }
-.ng-legend { display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--muted); }
+.ng-legend { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--muted); flex: 0 0 auto; }
 .ng-legend span { display: flex; align-items: center; gap: 6px; }
 .ng-swatch {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1100,21 +1130,64 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 /* ---------------- 2048 ---------------- */
 .g8-screen { display: flex; flex-direction: column; gap: 14px; align-items: center; }
 .g8-screen .chess-status { width: 100%; }
-.g8-wrap { touch-action: none; }
 .g8-grid {
-  display: grid; grid-template-columns: repeat(var(--n), 1fr);
-  width: min(90vw, 52vh, 440px); aspect-ratio: 1 / 1;
-  gap: 6px; padding: 6px; border-radius: 12px;
+  --g8-gap: 6px;
+  display: grid;
+  align-items: stretch; justify-items: stretch;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--n), minmax(0, 1fr));
+  width: var(--size, 320px); height: var(--size, 320px); flex: 0 0 auto;
+  gap: var(--g8-gap); padding: var(--g8-gap); border-radius: 14px;
   background: var(--soft); border: 1.5px solid var(--line-soft);
 }
+/* The D-pad: four chevrons drawn with borders, which stay crisp next to the
+   mono type in a way the ↑ ↓ ← → glyphs never did. */
+.g8-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; width: 100%; }
+.g8-dpad {
+  display: grid; flex: 0 0 auto;
+  grid-template-columns: repeat(3, 30px);
+  grid-template-rows: repeat(2, 30px);
+  gap: 3px; align-items: center; justify-items: center;
+}
+.g8-dir {
+  position: relative; width: 30px; height: 30px; padding: 0; cursor: pointer;
+  border: 1.5px solid var(--line-soft); border-radius: 8px; background: var(--bg);
+  transition: border-color .16s var(--ease), transform .12s var(--ease),
+    background .16s var(--ease);
+}
+.g8-dir::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px;
+  border-right: 2px solid var(--fg); border-bottom: 2px solid var(--fg);
+  transition: transform .16s var(--ease);
+}
+.g8-dir.up { grid-area: 1 / 2; }
+.g8-dir.left { grid-area: 2 / 1; }
+.g8-dir.down { grid-area: 2 / 2; }
+.g8-dir.right { grid-area: 2 / 3; }
+.g8-hintpad {
+  grid-area: 1 / 3; color: var(--muted); font-size: 8px;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.g8-dir.up::after { transform: translateY(2px) rotate(-135deg); }
+.g8-dir.down::after { transform: translateY(-2px) rotate(45deg); }
+.g8-dir.left::after { transform: translateX(2px) rotate(135deg); }
+.g8-dir.right::after { transform: translateX(-2px) rotate(-45deg); }
+.g8-dir:hover { border-color: var(--fg); background: var(--soft); }
+.g8-dir.up:hover::after { transform: translateY(0) rotate(-135deg); }
+.g8-dir.down:hover::after { transform: translateY(0) rotate(45deg); }
+.g8-dir.left:hover::after { transform: translateX(0) rotate(135deg); }
+.g8-dir.right:hover::after { transform: translateX(0) rotate(-45deg); }
+.g8-dir:active { transform: scale(.9); }
 /* One ink, eleven strengths: the same ramp reads correctly in both themes, and
    the number is always printed so no tile depends on its shade alone. */
 .g8-c {
   display: flex; align-items: center; justify-content: center;
+  min-width: 0; min-height: 0; overflow: hidden;
   border-radius: 8px; background: rgba(var(--g8-ink), var(--tone, 0));
   color: var(--fg); font-family: var(--mono); font-weight: 800;
-  font-size: clamp(15px, 4.6vw, 32px); letter-spacing: -0.03em;
-  transition: background .12s var(--ease), color .12s var(--ease);
+  font-size: var(--g8-font, clamp(15px, 4.6vw, 32px)); letter-spacing: -0.03em;
+  transition: translate .13s var(--ease), background .12s var(--ease),
+    color .12s var(--ease);
 }
 .g8-c.t1 { --tone: .05; box-shadow: inset 0 0 0 1.5px var(--line-soft); }
 .g8-c.t2 { --tone: .11; }
@@ -1144,18 +1217,19 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
 .ty-wrap {
-  position: relative; max-height: min(44vh, 360px); overflow-y: auto;
-  padding: 14px 16px; border-radius: var(--radius);
+  position: relative; flex: 1 1 auto; min-height: 52vh; max-height: none;
+  overflow-y: auto; padding: 18px 22px; border-radius: var(--radius);
   background: var(--soft); border: 1.5px solid var(--line-soft);
 }
 .ty-text {
   margin: 0; font-family: var(--mono); letter-spacing: .01em;
-  font-size: clamp(14px, 3.2vw, 19px); line-height: 1.9;
+  font-size: clamp(15px, 2.4vh, 24px); line-height: 1.95;
 }
 .ty-ch { color: var(--muted); border-radius: 3px; }
 .ty-ch.ok { color: var(--fg); }
 .ty-ch.bad { color: var(--bg); background: var(--danger); }
-.ty-ch.next { color: var(--bg); background: var(--fg); }
+.ty-ch.next { color: var(--bg); background: var(--fg); animation: caretBlink 1.05s var(--ease) infinite; }
+@keyframes caretBlink { 0%, 58% { opacity: 1; } 59%, 100% { opacity: .38; } }
 /* the real input is invisible on top of the passage, so phones get a keyboard */
 .ty-input {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -1167,10 +1241,10 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 .cb-screen { display: flex; flex-direction: column; gap: 14px; }
 .cb-screen .chess-status { width: 100%; }
 .cb-wrap {
-  display: flex; gap: 18px; align-items: flex-start;
-  justify-content: center; flex-wrap: wrap;
+  display: flex; gap: 18px; align-items: stretch;
+  justify-content: center; flex: 1 1 auto; min-height: 0; width: 100%;
 }
-.cb-rows { display: flex; flex-direction: column; gap: 6px; }
+.cb-rows { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding: 2px; }
 .cb-row {
   display: flex; align-items: center; gap: 10px; padding: 4px 10px;
   border-radius: 10px; border: 1.5px solid transparent; opacity: .5;
@@ -1223,18 +1297,19 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 }
 .la-word.start { box-shadow: inset 0 0 0 1.5px var(--line-soft); }
 .la-word.target { background: var(--fg); color: var(--bg); }
-.la-wrap { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; }
+.la-wrap { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 620px; flex: 1 1 auto; min-height: 0; }
 .la-rungs {
-  display: flex; flex-direction: column; gap: 6px;
-  max-height: min(38vh, 300px); overflow-y: auto; padding: 2px;
+  display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; padding: 2px;
 }
 .la-rung {
-  padding: 7px 14px; border-radius: 9px; background: var(--bg);
+  padding: 8px 16px; border-radius: 9px; background: var(--bg);
   box-shadow: inset 0 0 0 1.5px var(--line-soft); color: var(--fg);
   font-family: var(--mono); font-weight: 700; letter-spacing: .18em;
-  font-size: clamp(16px, 3.6vw, 21px);
+  font-size: clamp(17px, 2.6vh, 24px);
   transition: box-shadow .18s var(--ease);
 }
+.la-rung:first-child { animation: rise .24s var(--ease) both; }
 .la-rung span { opacity: .8; }
 /* the one letter that changed gets a block of its own */
 .la-rung b { background: var(--fg); color: var(--bg); border-radius: 3px; padding: 0 .08em; }
@@ -1731,6 +1806,10 @@ body.mind-armed .blank.filled { outline-style: dotted; }
   .tc-list { grid-template-columns: repeat(auto-fill, minmax(24px, 1fr)); gap: 4px; }
   .tc-side { min-width: 96px; padding: 7px 9px; }
   .tc-hint { display: none; }
+  /* the number pad goes under the grid rather than squeezing it sideways */
+  .su-body { flex-direction: column; align-items: center; }
+  .su-side { width: 100%; max-width: 430px; }
+  .su-pad { justify-content: center; }
 }
 
 /* ---------------- misc ---------------- *//* ---------------- misc ---------------- */
@@ -1741,7 +1820,7 @@ body.mind-armed .blank.filled { outline-style: dotted; }
 }
 
 @media (max-width: 560px) {
-  .app { padding: 22px 16px 56px; }
+  .app { padding: 22px 16px 24px; }
   .passage { font-size: 17px; line-height: 2.9; }
   .stat .v { font-size: 18px; }
   .stats { gap: 8px; }
@@ -4143,32 +4222,40 @@ const G2048 = (() => {
     return out;
   }
 
-  /* Slide and merge one line. Returns the board positions that just merged. */
+  /* Slide and merge one line. `from` gives, per landing square, the square the
+     tile came from (-1 for an empty landing square) so the view can animate it. */
   function collapse(st, cells) {
     const n = st.n;
-    const packed = [];
-    cells.forEach(i => { if (st.board[i]) packed.push(st.board[i]); });
+    const src = [];
+    cells.forEach(i => { if (st.board[i]) src.push(i); });
     const out = [];
+    const from = [];
     const mergedAt = [];
-    for (let k = 0; k < packed.length; k++) {
-      if (k < packed.length - 1 && packed[k] === packed[k + 1]) {
-        const v = packed[k] * 2;
+    for (let k = 0; k < src.length; k++) {
+      if (k < src.length - 1 && st.board[src[k]] === st.board[src[k + 1]]) {
+        const v = st.board[src[k]] * 2;
         out.push(v);
+        from.push(src[k]);            // anchor the slide on the first of the pair
         mergedAt.push(out.length - 1);
         st.score += v;
         st.merges++;
         k++;
       } else {
-        out.push(packed[k]);
+        out.push(st.board[src[k]]);
+        from.push(src[k]);
       }
     }
-    while (out.length < n) out.push(0);
+    while (out.length < n) { out.push(0); from.push(-1); }
     let changed = false;
     for (let k = 0; k < n; k++) {
       if (st.board[cells[k]] !== out[k]) changed = true;
       st.board[cells[k]] = out[k];
     }
-    return { changed: changed, mergedAt: mergedAt.map(k => cells[k]) };
+    return {
+      changed: changed,
+      mergedAt: mergedAt.map(k => cells[k]),
+      moved: from.map((f, k) => ({ from: f, to: cells[k] })).filter(m => m.from >= 0)
+    };
   }
 
   /* One swipe. `dir` is one of up / down / left / right. */
@@ -4176,11 +4263,18 @@ const G2048 = (() => {
     if (st.status !== 'playing') return { moved: false };
     if (!DIRS[dir]) return { moved: false };
     const merged = [];
+    const slides = [];
     let changed = false;
     lines(st, dir).forEach(line => {
+      const before = line.map(i => st.board[i]);
       const r = collapse(st, line);
       if (r.changed) changed = true;
       r.mergedAt.forEach(i => merged.push(i));
+      /* only tiles that actually travelled are worth animating */
+      r.moved.forEach(m => {
+        if (m.from !== m.to) slides.push(m);
+      });
+      void before;
     });
     if (!changed) return { moved: false };
 
@@ -4190,7 +4284,7 @@ const G2048 = (() => {
     if (bestTile(st) >= st.goal) st.status = 'won';
     else if (!hasMoves(st)) st.status = 'lost';
     return {
-      moved: true, merged: merged, spawned: spawned,
+      moved: true, merged: merged, slides: slides, spawned: spawned,
       status: st.status, score: st.score, best: bestTile(st)
     };
   }
@@ -4251,14 +4345,16 @@ const G2048 = (() => {
    bonus for a completely clean run.
    ============================================================ */
 const Typing = (() => {
+  /* `chars` is roughly how long a run should be — a couple of sentences, not a
+     whole paragraph, so a round takes half a minute instead of five. */
   const LEVELS = [
-    { key: 'primary', label: 'Primary', base: 80, wpm: 15,
+    { key: 'primary', label: 'Primary', base: 80, wpm: 15, chars: 90,
       desc: 'Short simple sentences. Aim for 15 words per minute.' },
-    { key: 'easy', label: 'Easy', base: 110, wpm: 20,
+    { key: 'easy', label: 'Easy', base: 110, wpm: 20, chars: 130,
       desc: 'Everyday sentences. Aim for 20 words per minute.' },
-    { key: 'medium', label: 'Medium', base: 160, wpm: 25,
+    { key: 'medium', label: 'Medium', base: 160, wpm: 25, chars: 170,
       desc: 'Longer sentences. Aim for 25 words per minute.' },
-    { key: 'hard', label: 'Hard', base: 220, wpm: 30,
+    { key: 'hard', label: 'Hard', base: 220, wpm: 30, chars: 210,
       desc: 'Dense sentences. Aim for 30 words per minute.' }
   ];
 
@@ -4274,6 +4370,18 @@ const Typing = (() => {
     return (p && p.length) ? p : PASSAGE_POOLS.easy;
   }
 
+  /* Keep the opening sentences of a passage until the run is long enough.
+     Stopping on a sentence boundary keeps it reading like real text. */
+  function trim(text, target) {
+    const parts = String(text).match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g) || [text];
+    let out = '';
+    for (let i = 0; i < parts.length; i++) {
+      if (out && (out + parts[i]).length > target) break;
+      out += parts[i];
+    }
+    return out.trim() || String(text).trim();
+  }
+
   function start(level) {
     const cfg = cfgOf(level);
     const list = pool(cfg.key);
@@ -4285,9 +4393,9 @@ const Typing = (() => {
     const info = (typeof DIFFICULTY !== 'undefined' && DIFFICULTY[cfg.key]) || { label: cfg.key };
     return {
       level: cfg.key, label: info.label || cfg.key,
-      base: cfg.base, wpmTarget: cfg.wpm,
-      title: pick.title, target: pick.text,
-      typed: '', correct: 0, errors: 0,
+      base: cfg.base, wpmTarget: cfg.wpm, charTarget: cfg.chars,
+      title: pick.title, target: trim(pick.text, cfg.chars),
+      typed: '', correct: 0, errors: 0, typedTotal: 0,
       status: 'playing', startedAt: Date.now(), elapsedMs: 0
     };
   }
@@ -4302,9 +4410,13 @@ const Typing = (() => {
     let correct = 0;
     for (let i = 0; i < v.length; i++) if (v[i] === st.target[i]) correct++;
     st.correct = correct;
-    /* only brand-new characters can add errors; fixing one removes the mark */
+    /* New characters are the only thing that can add a mistake, and each mistake
+       is counted once and kept — rubbing it out must not restore a clean run. */
     if (v.length > prevLen) {
-      for (let i = prevLen; i < v.length; i++) if (v[i] !== st.target[i]) st.errors++;
+      for (let i = prevLen; i < v.length; i++) {
+        st.typedTotal++;
+        if (v[i] !== st.target[i]) st.errors++;
+      }
     }
     if (v.length >= st.target.length) st.status = 'done';
     return { ok: true, correct: correct, errors: st.errors, done: st.status === 'done' };
@@ -4316,22 +4428,25 @@ const Typing = (() => {
     const typed = st.typed.length;
     const minutes = Math.max(1 / 60, (elapsedMs || 0) / 60000);
     const wpm = (typed / 5) / minutes;
-    const accuracy = typed ? st.correct / typed : 1;
+    /* accuracy over every key ever pressed for real, so deleting a typo does not
+       quietly hand back a 100% run */
+    const accuracy = st.typedTotal ? (st.typedTotal - st.errors) / st.typedTotal : 1;
     return { typed: typed, correct: st.correct, wpm: wpm, accuracy: accuracy, errors: st.errors };
   }
 
   function finish(st) {
     const cfg = cfgOf(st.level);
     const seconds = Math.max(1, Math.round((st.elapsedMs || 0) / 1000));
-    const live2 = live(st, st.elapsedMs || 0);
-    const wpm = live2.wpm;
-    const accuracy = live2.accuracy;
+    const state = live(st, st.elapsedMs || 0);
+    const wpm = state.wpm;
+    const accuracy = state.accuracy;
     const clean = st.errors === 0 && st.status === 'done';
     const speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, wpm / cfg.wpm));
     return {
       level: st.level, label: st.label, title: st.title,
       done: st.status === 'done', seconds: seconds,
       wpm: wpm, accuracy: accuracy, errors: st.errors,
+      keys: st.typedTotal,
       correct: st.correct, typed: st.typed.length, total: st.target.length,
       speed: speed, clean: clean, base: cfg.base, wpmTarget: cfg.wpm,
       points: st.status === 'done'
@@ -4570,12 +4685,12 @@ const Ladder = (() => {
   BANKS[4] = Array.from(new Set(BANKS[4]));
 
   const LEVELS = [
-    { key: 'easy', label: '3 letters', n: 3, minPath: 4, maxPath: 6, base: 80, par: 150,
-      desc: 'Short words like cat and dog. Four to six steps apart.' },
-    { key: 'medium', label: '4 letters', n: 4, minPath: 4, maxPath: 6, base: 130, par: 300,
-      desc: 'Four-letter words four to six steps apart.' },
-    { key: 'hard', label: '4 letters, longer', n: 4, minPath: 6, maxPath: 8, base: 170, par: 420,
-      desc: 'Four-letter words six to eight steps apart. Think ahead.' }
+    { key: 'easy', label: '3 letters', n: 3, minPath: 3, maxPath: 4, base: 80, par: 120,
+      desc: 'Short words like cat and dog. Only three or four steps apart.' },
+    { key: 'medium', label: '4 letters', n: 4, minPath: 4, maxPath: 5, base: 130, par: 260,
+      desc: 'Four-letter words four or five steps apart.' },
+    { key: 'hard', label: '4 letters, longer', n: 4, minPath: 5, maxPath: 6, base: 170, par: 380,
+      desc: 'Four-letter words five or six steps apart. Think a little ahead.' }
   ];
 
   const cfgOf = key => LEVELS.filter(l => l.key === key)[0] || LEVELS[0];
@@ -6912,13 +7027,13 @@ const UI = (() => {
     let cells = '';
     for (let i = 0; i < st.size; i++) cells += '<button class="mc" data-i="' + i + '"></button>';
     app().innerHTML =
-      '<div class="screen mine-screen">' +
+      '<div class="screen wide game-screen mine-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="mineLeft">' + st.mines + '</b><span>mines left</span></div>' +
           '<button class="mine-face" id="mineFace" title="New board" aria-label="New board">☺</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="mine-wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="minegrid" id="minegrid" style="--cols:' + st.cols + ';--rows:' + st.rows + '">' +
             cells +
           '</div>' +
@@ -7509,13 +7624,13 @@ const UI = (() => {
   function slideGame(st) {
     const tiles = st.size - 1;
     app().innerHTML =
-      '<div class="screen slide-screen">' +
+      '<div class="screen wide game-screen slide-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="moveCount">0</b><span>moves</span></div>' +
           '<button class="mine-face" id="slideNew" title="Scramble again" aria-label="Scramble again">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="slide-wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="slide-grid" id="slideGrid" style="--n:' + st.n + '"></div>' +
         '</div>' +
         '<div class="mine-foot">' +
@@ -7632,14 +7747,16 @@ const UI = (() => {
     pad += '<button class="su-key erase" data-v="0" title="Erase (Backspace)">⌫</button>';
 
     app().innerHTML =
-      '<div class="screen su-screen">' +
+      '<div class="screen wide game-screen su-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="suLeft">' + (st.size - st.clues) + '</b><span>to fill</span></div>' +
           '<button class="mine-face" id="suNew" title="New puzzle" aria-label="New puzzle">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="su-wrap">' +
-          '<div class="su-grid" id="suGrid">' + cells.join('') + '</div>' +
+        '<div class="su-body">' +
+          '<div class="game-stage" id="stage">' +
+            '<div class="su-grid" id="suGrid">' + cells.join('') + '</div>' +
+          '</div>' +
           '<div class="su-side">' +
             '<div class="su-pad" id="suPad">' + pad + '</div>' +
             '<button class="btn ghost su-notes" id="suNotes">Pencil marks: off</button>' +
@@ -7835,23 +7952,25 @@ const UI = (() => {
     }
 
     app().innerHTML =
-      '<div class="screen ng-screen">' +
+      '<div class="screen wide game-screen ng-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="ngShaded">0</b><span>shaded</span></div>' +
           '<button class="mine-face" id="ngNew" title="New picture" aria-label="New picture">↻</button>' +
           '<div class="mine-stat"><b id="timer">0:00</b><span>time</span></div>' +
         '</div>' +
-        '<div class="ng-wrap" id="ngWrap" style="--n:' + n + ';--c:' + c + 'px">' +
-          '<div class="ng-corner"></div>' +
-          '<div class="ng-top">' + top + '</div>' +
-          '<div class="ng-left">' + left + '</div>' +
-          '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
-        '</div>' +
-        '<div class="ng-legend">' +
-          '<span><i class="ng-swatch on"></i> shade</span>' +
-          '<span><i class="ng-swatch cross">×</i> must stay blank</span>' +
+        '<div class="game-stage" id="stage">' +
+          '<div class="ng-wrap" id="ngWrap" style="--n:' + n + ';--c:' + c + 'px">' +
+            '<div class="ng-corner"></div>' +
+            '<div class="ng-top">' + top + '</div>' +
+            '<div class="ng-left">' + left + '</div>' +
+            '<div class="ng-grid" id="ngGrid">' + cells + '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="mine-foot">' +
+          '<span class="ng-legend">' +
+            '<span><i class="ng-swatch on"></i> shade</span>' +
+            '<span><i class="ng-swatch cross">×</i> blank</span>' +
+          '</span>' +
           '<span class="mine-level">' + n + ' × ' + n +
             ' · par ' + fmtTime(st.par) + '</span>' +
           '<button class="btn ghost" id="ngMode">Shade: on</button>' +
@@ -7860,9 +7979,7 @@ const UI = (() => {
           '<button class="btn ghost" id="ngHelp">How to play</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, ' +
-          'or tap one at a time. The numbers are the lengths of each run of shaded ' +
-          'squares — press How to play for a worked example.</div>' +
+        '<div class="chess-status" id="ngStatus">Drag across squares to shade them, or tap one at a time.</div>' +
       '</div>';
   }
 
@@ -7950,32 +8067,46 @@ const UI = (() => {
     let cells = '';
     for (let i = 0; i < st.board.length; i++) cells += '<div class="g8-c" data-i="' + i + '"></div>';
     app().innerHTML =
-      '<div class="screen g8-screen">' +
+      '<div class="screen wide game-screen g8-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="g8Score">0</b><span>score</span></div>' +
           '<button class="mine-face" id="g8New" title="New grid" aria-label="New grid">↻</button>' +
           '<div class="mine-stat"><b id="g8Best">0</b><span>biggest · goal ' + st.goal + '</span></div>' +
         '</div>' +
-        '<div class="g8-wrap" id="g8Wrap">' +
+        '<div class="game-stage" id="stage">' +
           '<div class="g8-grid" id="g8Grid" style="--n:' + st.n + '">' + cells + '</div>' +
         '</div>' +
-        '<div class="mine-foot">' +
+        '<div class="g8-foot">' +
+          '<div class="g8-dpad">' +
+            '<button class="g8-dir up" data-dir="up" title="Up (arrow key / W)" aria-label="Up"></button>' +
+            '<button class="g8-dir left" data-dir="left" title="Left (arrow key / A)" aria-label="Left"></button>' +
+            '<span class="g8-hintpad">swipe</span>' +
+            '<button class="g8-dir right" data-dir="right" title="Right (arrow key / D)" aria-label="Right"></button>' +
+            '<button class="g8-dir down" data-dir="down" title="Down (arrow key / S)" aria-label="Down"></button>' +
+          '</div>' +
           '<span class="mine-level">' + esc(st.label) + ' · goal ' + st.goal +
             ' · ' + st.moves + ' moves</span>' +
-          '<button class="btn ghost" id="g8Up">↑</button>' +
-          '<button class="btn ghost" id="g8Down">↓</button>' +
-          '<button class="btn ghost" id="g8Left">←</button>' +
-          '<button class="btn ghost" id="g8Right">→</button>' +
           HOME_BTN +
         '</div>' +
-        '<div class="chess-status" id="g8Status">Swipe the grid, or use the arrow keys ' +
-          'or the buttons below.</div>' +
+        '<div class="chess-status" id="g8Status">Swipe the grid, use the arrow keys, ' +
+          'or tap the cross below.</div>' +
       '</div>';
+  }
+
+  /* A stand-in for app.js's reduceMotion flag, which is private to that module:
+     the global kill-switch in app.js still handles the CSS side. */
+  function motionOff() {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {
+      return false;
+    }
   }
 
   function g2048Sync(st, res) {
     const grid = document.getElementById('g8Grid');
     if (!grid) return;
+    const n = st.n;
     for (let i = 0; i < st.board.length; i++) {
       const el = grid.children[i];
       if (!el) continue;
@@ -7987,14 +8118,33 @@ const UI = (() => {
       if (el.textContent !== txt) el.textContent = txt;
       if (el.className !== cls) el.className = cls;
     }
+    /* Tiles that travelled start where they came from and ease into place. The
+       offset uses the independent `translate` property, so it composes with the
+       `scale` used by the pop animation instead of fighting it. */
+    const slides = (res && res.slides) || [];
+    const moving = slides.filter(s => s.from !== s.to);
+    if (moving.length && !motionOff()) {
+      moving.forEach(s => {
+        const el = grid.children[s.to];
+        if (!el) return;
+        const dx = (s.from % n) - (s.to % n);
+        const dy = ((s.from / n) | 0) - ((s.to / n) | 0);
+        el.style.transition = 'none';
+        el.style.translate = 'calc(' + dx + ' * (100% + var(--g8-gap))) ' +
+          'calc(' + dy + ' * (100% + var(--g8-gap)))';
+      });
+      void grid.offsetWidth;                    // bank the offset as the start
+      moving.forEach(s => {
+        const el = grid.children[s.to];
+        if (el) { el.style.transition = ''; el.style.translate = ''; }
+      });
+    }
     const sc = document.getElementById('g8Score');
     if (sc) sc.textContent = String(st.score);
     const bs = document.getElementById('g8Best');
     if (bs) bs.textContent = String(G2048.bestTile(st));
     const mv = document.querySelector('.g8-screen .mine-level');
-    if (mv) {
-      mv.textContent = st.label + ' · goal ' + st.goal + ' · ' + st.moves + ' moves';
-    }
+    if (mv) mv.textContent = st.label + ' · goal ' + st.goal + ' · ' + st.moves + ' moves';
   }
 
   function g2048Result(st, res) {
@@ -8056,7 +8206,7 @@ const UI = (() => {
 
   function typingGame(st) {
     app().innerHTML =
-      '<div class="screen ty-screen">' +
+      '<div class="screen wide game-screen ty-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="tyWpm">0</b><span>words / min</span></div>' +
           '<button class="mine-face" id="tyNew" title="Another passage" aria-label="Another passage">↻</button>' +
@@ -8089,14 +8239,17 @@ const UI = (() => {
     if (w) w.textContent = String(Math.round(live.wpm));
     const a = document.getElementById('tyAcc');
     if (a) a.textContent = Math.round(live.accuracy * 100) + '%';
-    /* keep the caret in view on a long passage */
+    /* keep the current character in view on a long passage */
     const wrap = document.getElementById('tyWrap');
     const next = text && text.querySelector('.ty-ch.next');
     if (wrap && next) {
-      const r = next.getBoundingClientRect();
-      const wr = wrap.getBoundingClientRect();
-      if (r.top < wr.top + 8 || r.bottom > wr.bottom - 8) {
-        wrap.scrollTop += r.top - wr.top - wrap.clientHeight / 2;
+      const top = next.offsetTop;
+      const line = next.offsetHeight || 26;
+      const seen = wrap.scrollTop;
+      const pad = 10;
+      if (top - pad < seen) wrap.scrollTop = Math.max(0, top - line * 1.5);
+      else if (top + line + pad > seen + wrap.clientHeight) {
+        wrap.scrollTop = top - wrap.clientHeight + line * 2.5;
       }
     }
   }
@@ -8170,7 +8323,7 @@ const UI = (() => {
     pad += '<button class="cb-key go" data-cmd="go" title="Submit (Enter)">Guess</button>';
 
     app().innerHTML =
-      '<div class="screen cb-screen">' +
+      '<div class="screen wide game-screen cb-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="cbLeft">' + st.maxTries + '</b><span>guesses left</span></div>' +
           '<button class="mine-face" id="cbNew" title="New code" aria-label="New code">↻</button>' +
@@ -8280,7 +8433,7 @@ const UI = (() => {
 
   function ladderGame(st) {
     app().innerHTML =
-      '<div class="screen la-screen">' +
+      '<div class="screen wide game-screen la-screen">' +
         '<div class="mine-head">' +
           '<div class="mine-stat"><b id="laSteps">0</b><span>steps</span></div>' +
           '<button class="mine-face" id="laNew" title="New ladder" aria-label="New ladder">↻</button>' +
@@ -10181,9 +10334,11 @@ const App = (() => {
       tcFitBoard();
       tcApplyZoom();
     }
-    if (!wordstackState) return;
-    wsFitBoard();
-    wsApplyZoom();
+    if (wordstackState) {
+      wsFitBoard();
+      wsApplyZoom();
+    }
+    fitActiveGame();
   }
 
   function bindWsGestures() {
@@ -10602,6 +10757,7 @@ const App = (() => {
     UI.mineGame(mineState);
     bindMine();
     bindHome();
+    mineFit();
     refreshMine();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
@@ -10747,6 +10903,8 @@ const App = (() => {
     UI.slideGame(slideState);
     bindSlide();
     bindHome();
+    slideFit();
+    UI.slideSync(slideState, null);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
@@ -10841,6 +10999,7 @@ const App = (() => {
     boardBusy = false;
     UI.sudokuGame(suState);
     suState.sel = Sudoku.firstEmpty(suState);
+    suFit();
     UI.sudokuSync(suState);
     bindSudoku();
     bindHome();
@@ -10936,6 +11095,73 @@ const App = (() => {
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
+  /* ---- filling the stage ----
+     Each board asks its `.game-stage` how much room it has and sizes itself to
+     that, so the layout follows the window instead of a fixed pixel cap. */
+  function stageBox() {
+    const el = document.getElementById('stage');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 60 || r.height < 60) return null;
+    return { w: r.width - 4, h: r.height - 4 };
+  }
+
+  const clampTo = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function g8Fit() {
+    const grid = document.getElementById('g8Grid');
+    const box = stageBox();
+    if (!grid || !box || !g8State) return;
+    /* a square board may borrow a little height back from the chrome, which is
+       worth far more to the player than a screen that never scrolls */
+    const size = clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 200, 760);
+    grid.style.setProperty('--size', size + 'px');
+    grid.style.setProperty('--g8-font', Math.round(size / g8State.n * 0.44) + 'px');
+  }
+
+  function suFit() {
+    const grid = document.getElementById('suGrid');
+    const box = stageBox();
+    if (!grid || !box) return;
+    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.15)), 220, 700) + 'px');
+  }
+
+  function slideFit() {
+    const grid = document.getElementById('slideGrid');
+    const box = stageBox();
+    if (!grid || !box) return;
+    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 220, 720) + 'px');
+  }
+
+  function ngFit() {
+    const wrap = document.getElementById('ngWrap');
+    const box = stageBox();
+    if (!wrap || !box || !ngState) return;
+    const n = ngState.n;
+    /* the clue strips take about 2.4 cells, plus the gap that separates them */
+    const c = clampTo(Math.floor(Math.min(box.w / (n + 2.7), box.h * 1.15 / (n + 2.7))), 11, 48);
+    wrap.style.setProperty('--c', c + 'px');
+  }
+
+  function mineFit() {
+    const grid = document.getElementById('minegrid');
+    const box = stageBox();
+    if (!grid || !box || !mineState) return;
+    /* readable cells matter more here than a screen that fits, and a wide grid
+       has spare width to spend, so let it run a little past the stage height */
+    const c = clampTo(Math.floor(Math.min(box.w / mineState.cols,
+      box.h * 1.55 / mineState.rows) - 2), 18, 34);
+    grid.style.setProperty('--cell', c + 'px');
+  }
+
+  function fitActiveGame() {
+    if (g8State) g8Fit();
+    if (suState) suFit();
+    if (slideState) slideFit();
+    if (ngState) ngFit();
+    if (mineState) mineFit();
+  }
+
   /* ---------------- Nonogram ---------------- */
 
   let ngPaint = null;          // { value } while dragging across squares
@@ -10960,6 +11186,7 @@ const App = (() => {
     UI.nonogramGame(ngState);
     bindNonogram();
     bindHome();
+    ngFit();
     UI.nonogramSync(ngState);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
@@ -11113,13 +11340,14 @@ const App = (() => {
     UI.g2048Game(g8State);
     bindG2048();
     bindHome();
+    g8Fit();
     UI.g2048Sync(g8State, null);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function bindG2048() {
-    const wrap = document.getElementById('g8Wrap');
+    const wrap = document.getElementById('g8Grid');
     if (wrap) {
       wrap.addEventListener('pointerdown', e => {
         g8Swipe = { x: e.clientX, y: e.clientY };
@@ -11135,11 +11363,9 @@ const App = (() => {
       });
       wrap.addEventListener('pointercancel', () => { g8Swipe = null; });
     }
-    [['g8Up', 'up'], ['g8Down', 'down'], ['g8Left', 'left'], ['g8Right', 'right']]
-      .forEach(pair => {
-        const b = document.getElementById(pair[0]);
-        if (b) b.addEventListener('click', () => doG2048Move(pair[1]));
-      });
+    document.querySelectorAll('.g8-dir').forEach(b => {
+      b.addEventListener('click', () => doG2048Move(b.dataset.dir));
+    });
     const again = document.getElementById('g8New');
     if (again) again.addEventListener('click', () => startG2048(g8State ? g8State.level : g8Level));
   }

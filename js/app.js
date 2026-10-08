@@ -1659,9 +1659,11 @@ const App = (() => {
       tcFitBoard();
       tcApplyZoom();
     }
-    if (!wordstackState) return;
-    wsFitBoard();
-    wsApplyZoom();
+    if (wordstackState) {
+      wsFitBoard();
+      wsApplyZoom();
+    }
+    fitActiveGame();
   }
 
   function bindWsGestures() {
@@ -2080,6 +2082,7 @@ const App = (() => {
     UI.mineGame(mineState);
     bindMine();
     bindHome();
+    mineFit();
     refreshMine();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
@@ -2225,6 +2228,8 @@ const App = (() => {
     UI.slideGame(slideState);
     bindSlide();
     bindHome();
+    slideFit();
+    UI.slideSync(slideState, null);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
@@ -2319,6 +2324,7 @@ const App = (() => {
     boardBusy = false;
     UI.sudokuGame(suState);
     suState.sel = Sudoku.firstEmpty(suState);
+    suFit();
     UI.sudokuSync(suState);
     bindSudoku();
     bindHome();
@@ -2414,6 +2420,73 @@ const App = (() => {
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
+  /* ---- filling the stage ----
+     Each board asks its `.game-stage` how much room it has and sizes itself to
+     that, so the layout follows the window instead of a fixed pixel cap. */
+  function stageBox() {
+    const el = document.getElementById('stage');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 60 || r.height < 60) return null;
+    return { w: r.width - 4, h: r.height - 4 };
+  }
+
+  const clampTo = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function g8Fit() {
+    const grid = document.getElementById('g8Grid');
+    const box = stageBox();
+    if (!grid || !box || !g8State) return;
+    /* a square board may borrow a little height back from the chrome, which is
+       worth far more to the player than a screen that never scrolls */
+    const size = clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 200, 760);
+    grid.style.setProperty('--size', size + 'px');
+    grid.style.setProperty('--g8-font', Math.round(size / g8State.n * 0.44) + 'px');
+  }
+
+  function suFit() {
+    const grid = document.getElementById('suGrid');
+    const box = stageBox();
+    if (!grid || !box) return;
+    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.15)), 220, 700) + 'px');
+  }
+
+  function slideFit() {
+    const grid = document.getElementById('slideGrid');
+    const box = stageBox();
+    if (!grid || !box) return;
+    grid.style.setProperty('--size', clampTo(Math.round(Math.min(box.w, box.h * 1.2)), 220, 720) + 'px');
+  }
+
+  function ngFit() {
+    const wrap = document.getElementById('ngWrap');
+    const box = stageBox();
+    if (!wrap || !box || !ngState) return;
+    const n = ngState.n;
+    /* the clue strips take about 2.4 cells, plus the gap that separates them */
+    const c = clampTo(Math.floor(Math.min(box.w / (n + 2.7), box.h * 1.15 / (n + 2.7))), 11, 48);
+    wrap.style.setProperty('--c', c + 'px');
+  }
+
+  function mineFit() {
+    const grid = document.getElementById('minegrid');
+    const box = stageBox();
+    if (!grid || !box || !mineState) return;
+    /* readable cells matter more here than a screen that fits, and a wide grid
+       has spare width to spend, so let it run a little past the stage height */
+    const c = clampTo(Math.floor(Math.min(box.w / mineState.cols,
+      box.h * 1.55 / mineState.rows) - 2), 18, 34);
+    grid.style.setProperty('--cell', c + 'px');
+  }
+
+  function fitActiveGame() {
+    if (g8State) g8Fit();
+    if (suState) suFit();
+    if (slideState) slideFit();
+    if (ngState) ngFit();
+    if (mineState) mineFit();
+  }
+
   /* ---------------- Nonogram ---------------- */
 
   let ngPaint = null;          // { value } while dragging across squares
@@ -2438,6 +2511,7 @@ const App = (() => {
     UI.nonogramGame(ngState);
     bindNonogram();
     bindHome();
+    ngFit();
     UI.nonogramSync(ngState);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
@@ -2591,13 +2665,14 @@ const App = (() => {
     UI.g2048Game(g8State);
     bindG2048();
     bindHome();
+    g8Fit();
     UI.g2048Sync(g8State, null);
     startTimer();
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function bindG2048() {
-    const wrap = document.getElementById('g8Wrap');
+    const wrap = document.getElementById('g8Grid');
     if (wrap) {
       wrap.addEventListener('pointerdown', e => {
         g8Swipe = { x: e.clientX, y: e.clientY };
@@ -2613,11 +2688,9 @@ const App = (() => {
       });
       wrap.addEventListener('pointercancel', () => { g8Swipe = null; });
     }
-    [['g8Up', 'up'], ['g8Down', 'down'], ['g8Left', 'left'], ['g8Right', 'right']]
-      .forEach(pair => {
-        const b = document.getElementById(pair[0]);
-        if (b) b.addEventListener('click', () => doG2048Move(pair[1]));
-      });
+    document.querySelectorAll('.g8-dir').forEach(b => {
+      b.addEventListener('click', () => doG2048Move(b.dataset.dir));
+    });
     const again = document.getElementById('g8New');
     if (again) again.addEventListener('click', () => startG2048(g8State ? g8State.level : g8Level));
   }
