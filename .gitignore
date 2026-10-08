@@ -1,0 +1,9 @@
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+
+# scratch files used while testing (screenshots, one-off validation scripts)
+_*.js
+_*.png
